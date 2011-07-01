@@ -29,7 +29,7 @@ private:
     if (rv.buffer.get () != 0 && rv.buffer->size () == sizeof (mftp::message)) {
       std::auto_ptr<mftp::message> m (new mftp::message);
       memcpy (m.get (), rv.buffer->data (), rv.buffer->size ());
-      if (convert_to_host (m.get ())) {
+      if (m.get ()->convert_to_host ()) {
 	q.push (ioa::const_shared_ptr<mftp::message> (m.release ()));
       }
     }
@@ -51,50 +51,6 @@ private:
 
 public:
   V_UP_OUTPUT (conversion_channel_automaton, pass_message, ioa::const_shared_ptr<mftp::message>);
-
-private:
-  bool convert_to_host (mftp::message* m) {
-    m->header.message_type = ntohl (m->header.message_type);
-    switch (m->header.message_type) {
-    case mftp::FRAGMENT:
-      {
-	m->frag.fid.length = ntohl (m->frag.fid.length);
-	m->frag.fid.type = ntohl (m->frag.fid.type);
-	m->frag.offset = ntohl (m->frag.offset);
-	mftp::mfileid mid (m->frag.fid);
-	return ((m->frag.offset % mftp::FRAGMENT_SIZE) == 0) &&
-	  (m->frag.offset < mid.get_final_length ());
-      }
-      break;
-    case mftp::REQUEST:
-      {
-	m->req.fid.length = ntohl (m->req.fid.length);
-	m->req.fid.type = ntohl (m->req.fid.type);
-	m->req.span_count = ntohl (m->req.span_count);
-	if (m->req.span_count == 0 || m->req.span_count > mftp::SPANS_SIZE) {
-	  return false;
-	}
-	mftp::mfileid mid (m->req.fid);
-	for (uint32_t i = 0; i < m->req.span_count; ++i){
-	  m->req.spans[i].start = ntohl (m->req.spans[i].start);
-	  m->req.spans[i].stop = ntohl (m->req.spans[i].stop);
-	  if (!(m->req.spans[i].start < m->req.spans[i].stop &&
-		m->req.spans[i].stop <= mid.get_final_length () &&
-		m->req.spans[i].start % mftp::FRAGMENT_SIZE == 0 &&
-		m->req.spans[i].stop % mftp::FRAGMENT_SIZE == 0)) {
-	    return false;
-	  }
-	}
-	return true;
-      }
-      break;
-    default:
-      return false;
-      break;
-    }
-
-    return false;
-  }
 };
 
 #endif

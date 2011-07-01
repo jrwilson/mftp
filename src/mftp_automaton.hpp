@@ -230,7 +230,9 @@ namespace mftp {
 	--m_their_req_count;
 
 	// Get the fragment for that index.
-	m_sendq.push (ioa::const_shared_ptr<message_buffer> (convert_to_network (get_fragment (randy))));
+	message_buffer* m = get_fragment (randy);
+	m->convert_to_network ();
+	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
       }
 
       m_fragment_timer_state = SET_READY;
@@ -266,9 +268,10 @@ namespace mftp {
 	  }
 	}
 
-	m_sendq.push (ioa::const_shared_ptr<message_buffer> (convert_to_network (new message_buffer (request_type (), m_fileid, sp_count, spans))));
+	message_buffer* m = new message_buffer (request_type (), m_fileid, sp_count, spans);
+	m->convert_to_network ();
+	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
       }
-
       m_request_timer_state = SET_READY;
     }
 
@@ -287,7 +290,9 @@ namespace mftp {
     
     void announcement_timer_interrupt_effect () {
       if (!m_file.empty () && m_sendq.empty()) {
-	m_sendq.push (ioa::const_shared_ptr<message_buffer> (convert_to_network (get_fragment (m_file.get_random_index ()))));
+	message_buffer* m = get_fragment (m_file.get_random_index ());
+	m->convert_to_network ();
+	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
       }
       m_announcement_timer_state = SET_READY;
     }
@@ -307,27 +312,6 @@ namespace mftp {
     V_UP_OUTPUT (mftp_automaton, download_complete, mftp::file);
 
   private:
-    message_buffer* convert_to_network (message_buffer* m) {
-      switch (m->msg.header.message_type) {
-      case FRAGMENT:
-        m->msg.frag.fid.length = htonl (m->msg.frag.fid.length);
-        m->msg.frag.fid.type = htonl (m->msg.frag.fid.type);
-        m->msg.frag.offset = htonl (m->msg.frag.offset);
-	break;
-      case REQUEST:
-        m->msg.req.fid.length = htonl (m->msg.req.fid.length);
-        m->msg.req.fid.type = htonl (m->msg.req.fid.type);
-	for (uint32_t i = 0; i < m->msg.req.span_count; ++i){
-	  m->msg.req.spans[i].start = htonl (m->msg.req.spans[i].start);
-	  m->msg.req.spans[i].stop = htonl (m->msg.req.spans[i].stop);
-	}
-	m->msg.req.span_count = htonl (m->msg. req.span_count);
-	break;
-      }
-      m->msg.header.message_type = htonl (m->msg.header.message_type);
-      return m;
-    }
-
     uint32_t get_random_request_index () {
       assert (m_their_req_count != 0);
       uint32_t rf = rand () % m_their_req.size();
