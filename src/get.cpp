@@ -51,7 +51,7 @@ private:
 
   void receive_effect (const ioa::const_shared_ptr<mftp::message>& m){
     if (m->header.message_type == mftp::FRAGMENT) {
-      if (m->frag.fid.type == META_TYPE) {
+      if (m->frag.fid.type == META_TYPE && meta_files.count (m->frag.fid) == 0) {
 	mftp::file f (m->frag.fid);
 	f.write_chunk (m->frag.offset, m->frag.data);
 	if(f.complete ()) {
@@ -80,6 +80,7 @@ private:
 				       &m_self, &mftp_client_automaton::meta_complete);
 	  }
 	}
+	meta_files.insert(m->frag.fid);
       }
     }
   }
