@@ -166,24 +166,85 @@ namespace mftp {
     fileid fid;
     uint32_t offset;
     uint8_t data[FRAGMENT_SIZE];
-  };
 
+    void convert_to_network () {
+      fid.convert_to_network ();
+      offset = htonl (offset);
+    }
+
+    bool convert_to_host () {
+      fid.convert_to_host ();
+      offset = ntohl (offset);
+
+      mfileid mid (fid);
+      return ((offset % FRAGMENT_SIZE) == 0) && (offset < mid.get_final_length ());
+    }
+  };
+  
   struct span_t
   {
     uint32_t start;
     uint32_t stop;
+    
+    void convert_to_network () {
+      start = htonl (start);
+      stop = htonl (stop);
+    }
+    
+    void convert_to_host () {
+      start = ntohl (start);
+      stop = ntohl (stop);
+    }
   };
-
+  
   struct request
   {
     fileid fid;
     uint32_t span_count;
     span_t spans[SPANS_SIZE];
+    
+    void convert_to_network () {
+      fid.convert_to_network ();
+      for (uint32_t i = 0; i < span_count; ++i) {
+	spans[i].convert_to_network ();
+      }
+      span_count = htonl (span_count);
+    }
+    
+    bool convert_to_host () {
+      fid.convert_to_host ();
+      span_count = ntohl (span_count);
+      
+      if (span_count == 0 || span_count > SPANS_SIZE) {
+	return false;
+      }
+      
+      mfileid mid (fid);
+      for (uint32_t i = 0; i < span_count; ++i) {
+	spans[i].convert_to_host ();
+	
+	if (!((spans[i].start < spans[i].stop) &&
+	      (spans[i].stop <= mid.get_final_length () ) &&
+	      (spans[i].start % FRAGMENT_SIZE == 0) &&
+	      (spans[i].stop % FRAGMENT_SIZE == 0) )) {
+	  return false;
+	}
+      }
+      return true;
+    }
   };
-
+  
   struct message_header
   {
     uint32_t message_type;
+    
+    void convert_to_network () {
+      message_type = htonl (message_type);
+    }
+
+    void convert_to_host () {
+      message_type = ntohl (message_type);
+    }
   };
 
   struct fragment_type { };
@@ -222,6 +283,30 @@ namespace mftp {
 	req.spans[i] = spans[i];
       }
     }
+
+    void convert_to_network () {
+      switch (header.message_type) {
+      case FRAGMENT:
+        frag.convert_to_network ();
+	break;
+      case REQUEST:
+	req.convert_to_network ();
+	break;
+      }
+      header.convert_to_network ();
+    }
+
+    bool convert_to_host () {
+      header.convert_to_host ();
+      switch (header.message_type) {
+      case FRAGMENT:
+        return frag.convert_to_host ();
+      case REQUEST:
+	return req.convert_to_host ();
+      default:
+	return false;
+      }
+    }
   };
 
   struct message_buffer :
@@ -249,6 +334,14 @@ namespace mftp {
 
     size_t size () const {
       return sizeof (message);
+    }
+
+    void convert_to_network () {
+      msg.convert_to_network ();
+    }
+
+    void convert_to_host () {
+      msg.convert_to_host ();
     }
   };
 
