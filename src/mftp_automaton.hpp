@@ -7,6 +7,7 @@
 #include <ioa/udp_receiver_automaton.hpp>
 
 #include <arpa/inet.h>
+#include <config.hpp>
 #include <cstdlib>
 #include <queue>
 #include <vector>
@@ -131,7 +132,7 @@ namespace mftp {
     }
 
     ioa::udp_sender_automaton::send_arg send_effect () {
-      ioa::inet_address a ("255.255.255.255", 54321);
+      ioa::inet_address a ("224.0.0.137", 54321);
       ioa::const_shared_ptr<message_buffer> m = m_sendq.front ();
       m_sendq.pop ();
       m_send_state = SEND_COMPLETE_WAIT;
@@ -142,8 +143,20 @@ namespace mftp {
     V_UP_OUTPUT (mftp_automaton, send, ioa::udp_sender_automaton::send_arg);
 
   private:
-    void send_complete_effect (const int& sc) {
-      m_send_state = SEND_READY;
+    void send_complete_effect (const int& result) {
+      if (result != 0) {
+	char buf[256];
+#ifdef STRERROR_R_CHAR_P
+	std::cerr << "Couldn't send udp_sender_automaton: " << strerror_r (result, buf, 256) << std::endl;
+#else
+	strerror_r (result, buf, 256);
+	std::cerr << "Couldn't send udp_sender_automaton: " << buf << std::endl;
+#endif
+	exit(EXIT_FAILURE);
+      }
+      else {
+	m_send_state = SEND_READY;
+      }
     }
 
   public:

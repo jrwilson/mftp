@@ -25,13 +25,15 @@ public:
     //mftp::file f ("ftestBig.txt", FILE_TYPE);
     //mftp::file g (f.get_mfileid ().get_fileid ());
     const std::string address = "0.0.0.0";
+    const std::string mc_address = "224.0.0.137";
     const unsigned short port = 54321;
   
-    ioa::inet_address m_address (address, port);
+    ioa::inet_address local_address (address, port);
+    ioa::inet_address multicast_address (mc_address, port);
     
     sender = new ioa::automaton_manager<ioa::udp_sender_automaton> (this, ioa::make_generator<ioa::udp_sender_automaton> ());
  
-    ioa::automaton_manager<ioa::udp_receiver_automaton>* receiver = new ioa::automaton_manager<ioa::udp_receiver_automaton> (this, ioa::make_generator<ioa::udp_receiver_automaton> (m_address));
+    ioa::automaton_manager<ioa::udp_receiver_automaton>* receiver = new ioa::automaton_manager<ioa::udp_receiver_automaton> (this, ioa::make_generator<ioa::udp_receiver_automaton> (multicast_address, local_address));
 
     converter = new ioa::automaton_manager<conversion_channel_automaton> (this, ioa::make_generator<conversion_channel_automaton> ());
 
