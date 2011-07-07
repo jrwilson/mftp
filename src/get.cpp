@@ -8,7 +8,8 @@
 #include <set>
 
 class mftp_client_automaton :
-  public ioa::automaton {
+  public ioa::automaton,
+  private ioa::observer {
 
 private:
   ioa::handle_manager<mftp_client_automaton> m_self;
@@ -22,8 +23,6 @@ public:
     m_self (ioa::get_aid ()),
     m_filename (fname)
   {
-    //mftp::file f ("ftestBig.txt", FILE_TYPE);
-    //mftp::file g (f.get_mfileid ().get_fileid ());
     const std::string address = "0.0.0.0";
     const std::string mc_address = "224.0.0.137";
     const unsigned short port = 54321;
@@ -37,6 +36,9 @@ public:
 
     converter = new ioa::automaton_manager<conversion_channel_automaton> (this, ioa::make_generator<conversion_channel_automaton> ());
 
+    add_observable (sender);
+    add_observable (converter);
+    
     ioa::make_binding_manager (this,
 			       receiver, &ioa::udp_receiver_automaton::receive,
 			       converter, &conversion_channel_automaton::receive_buffer);
@@ -49,7 +51,27 @@ public:
 private:
   void schedule () const { }
 
+  void observe (ioa::observable* o) {
+    //need to do -1 == sender->get_handle () instead of the normal syntax
+    //the other way it gets confused whether to convert -1 to a handle or the get_handle () handle to an int
+    if (o == sender && -1 == sender->get_handle ()) {
+      sender = 0;
+    }
+    else if (o == converter && -1 == converter->get_handle()) {
+      converter = 0;
+    }
+
+    if (sender != 0 && converter != 0) {
+      if (sender->get_handle () != -1 && converter->get_handle () != -1) {
+	//ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (m_filename.c_str(), mftp::QUERY_TYPE), true, true, sender->get_handle(), converter->get_handle()));
+	mftp::file f (m_filename.c_str (), QUERY_TYPE);
+	ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, true, true, sender->get_handle (), converter->get_handle () ) );
+      }
+    }
+  }
+
   void receive_effect (const ioa::const_shared_ptr<mftp::message>& m){
+    /*
     if (m->header.message_type == mftp::FRAGMENT) {
       if (m->frag.fid.type == META_TYPE && meta_files.count (m->frag.fid) == 0) {
 	mftp::file f (m->frag.fid);
@@ -83,6 +105,7 @@ private:
 	meta_files.insert(m->frag.fid);
       }
     }
+    */
   }
   
 public:
@@ -90,7 +113,7 @@ public:
   
 private:
   void process_meta_file (const mftp::file& f) {
-    if (f.get_mfileid ().get_original_length () > sizeof (mftp::fileid)) {
+    /*   if (f.get_mfileid ().get_original_length () > sizeof (mftp::fileid)) {
       std::string s (reinterpret_cast<const char*> (f.get_data_ptr ()) + sizeof (mftp::fileid), f.get_mfileid ().get_original_length () - sizeof (mftp::fileid));
       
       if (s == m_filename){
@@ -119,6 +142,7 @@ private:
 				   &m_self, &mftp_client_automaton::file_complete);
       }	
     }
+    */
   }
 
   void meta_complete_effect (const mftp::file& f, ioa::aid_t) {

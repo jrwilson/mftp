@@ -10,7 +10,11 @@
 #include <string>
 
 class mftp_server_automaton :
-  public ioa::automaton {
+  public ioa::automaton,
+  private ioa::observer {
+private:
+  ioa::automaton_manager<ioa::udp_sender_automaton>* sender;
+  ioa::automaton_manager<conversion_channel_automaton>* converter;
 public:
   mftp_server_automaton (const char* fname, const char* sname)
   {
@@ -38,19 +42,21 @@ public:
     ioa::inet_address local_address (address, port);
     ioa::inet_address multicast_address (mc_address, port);
 
-    ioa::automaton_manager<ioa::udp_sender_automaton>* sender = new ioa::automaton_manager<ioa::udp_sender_automaton> (this, ioa::make_generator<ioa::udp_sender_automaton> ());
+    sender = new ioa::automaton_manager<ioa::udp_sender_automaton> (this, ioa::make_generator<ioa::udp_sender_automaton> ());
 
     ioa::automaton_manager<ioa::udp_receiver_automaton>* receiver = new ioa::automaton_manager<ioa::udp_receiver_automaton> (this, ioa::make_generator<ioa::udp_receiver_automaton> (multicast_address, local_address));
 
-    ioa::automaton_manager<conversion_channel_automaton>* converter = new ioa::automaton_manager<conversion_channel_automaton> (this, ioa::make_generator<conversion_channel_automaton> ());
+    converter = new ioa::automaton_manager<conversion_channel_automaton> (this, ioa::make_generator<conversion_channel_automaton> ());
 
+    add_observable (sender);
+    add_observable (converter);
     ioa::make_binding_manager (this,
 			       receiver, &ioa::udp_receiver_automaton::receive,
 			       converter, &conversion_channel_automaton::receive_buffer);
 
-    ioa::automaton_manager<mftp::mftp_automaton>* file_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file));
+    ioa::automaton_manager<mftp::mftp_automaton>* file_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, false, true, sender->get_handle(), converter->get_handle()));
 
-    ioa::automaton_manager<mftp::mftp_automaton>* meta_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta));
+    ioa::automaton_manager<mftp::mftp_automaton>* meta_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, true, false, sender->get_handle (), converter->get_handle ()));
 
 
     ioa::make_binding_manager (this,
@@ -77,6 +83,24 @@ public:
 			       converter, &conversion_channel_automaton::pass_message,
 			       meta_server, &mftp::mftp_automaton::receive);    
   }
+
+  void observe (ioa::observable* o) {
+    //need to do -1 == sender->get_handle () instead of the normal syntax
+    //the other way it gets confused whether to convert -1 to a handle or the get_handle () handle to an int
+    if (o == sender && -1 == sender->get_handle ()) {
+      sender = 0;
+    }
+    else if (o == converter && -1 == converter->get_handle()) {
+      converter = 0;
+    }
+
+    if (sender != 0 && converter != 0) {
+      if (sender->get_handle () != -1 && converter->get_handle () != -1) {
+	//ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (m_filename.c_str(), mftp::QUERY_TYPE), true, true, sender, converter));
+      }
+    }
+  }
+
 };
 
 int main (int argc, char* argv[]) {

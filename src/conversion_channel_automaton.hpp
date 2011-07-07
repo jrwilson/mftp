@@ -3,6 +3,7 @@
 
 #include "mftp.hpp"
 #include <ioa/ioa.hpp>
+#include <ioa/udp_receiver_automaton.hpp>
 
 #include <queue>
 

@@ -7,6 +7,7 @@
 
 #define FILE_TYPE 0
 #define META_TYPE 1
+#define QUERY_TYPE 2
 
 namespace mftp {
   
