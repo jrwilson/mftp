@@ -15,25 +15,16 @@ class mftp_server_automaton :
 private:
   ioa::automaton_manager<ioa::udp_sender_automaton>* sender;
   ioa::automaton_manager<conversion_channel_automaton>* converter;
+  const char* m_filename;
+  const char* m_sharename;
 public:
-  mftp_server_automaton (const char* fname, const char* sname)
+  mftp_server_automaton (const char* fname, const char* sname):
+    m_filename (fname),
+    m_sharename (sname)
   {
-    mftp::file file (fname, FILE_TYPE);
-
+    mftp::file file (m_filename, FILE_TYPE);
     mftp::fileid copy = file.get_mfileid ().get_fileid ();
-
     std::cout << "Sharing " << fname << " as " << (std::string (sname) + "-" + copy.to_string ()) << std::endl;
-
-    copy.convert_to_network ();
-    
-    uint32_t size = strlen (sname);
-    
-    ioa::buffer buff (sizeof (mftp::fileid) + size * sizeof (char));
-    
-    memcpy (buff.data (), &copy, sizeof (mftp::fileid));
-    memcpy (static_cast<char*>(buff.data ()) + sizeof(mftp::fileid), sname, size);
-    
-    mftp::file meta (buff.data (), buff.size ());
 
     const std::string address = "0.0.0.0";
     const std::string mc_address = "224.0.0.137";
@@ -53,35 +44,7 @@ public:
     ioa::make_binding_manager (this,
 			       receiver, &ioa::udp_receiver_automaton::receive,
 			       converter, &conversion_channel_automaton::receive_buffer);
-
-    ioa::automaton_manager<mftp::mftp_automaton>* file_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, false, true, sender->get_handle(), converter->get_handle()));
-
-    ioa::automaton_manager<mftp::mftp_automaton>* meta_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, true, false, sender->get_handle (), converter->get_handle ()));
-
-
-    ioa::make_binding_manager (this,
-			       file_server, &mftp::mftp_automaton::send,
-			       sender, &ioa::udp_sender_automaton::send);
-
-    ioa::make_binding_manager (this,
-			       sender, &ioa::udp_sender_automaton::send_complete,
-			       file_server, &mftp::mftp_automaton::send_complete);
-
-    ioa::make_binding_manager (this,
-			       converter, &conversion_channel_automaton::pass_message,
-			       file_server, &mftp::mftp_automaton::receive);    
-
-    ioa::make_binding_manager (this,
-  			       meta_server, &mftp::mftp_automaton::send,
-  			       sender, &ioa::udp_sender_automaton::send);
-
-    ioa::make_binding_manager (this,
-  			       sender, &ioa::udp_sender_automaton::send_complete,
-  			       meta_server, &mftp::mftp_automaton::send_complete);
-
-    ioa::make_binding_manager (this,
-			       converter, &conversion_channel_automaton::pass_message,
-			       meta_server, &mftp::mftp_automaton::receive);    
+ 
   }
 
   void observe (ioa::observable* o) {
@@ -96,7 +59,25 @@ public:
 
     if (sender != 0 && converter != 0) {
       if (sender->get_handle () != -1 && converter->get_handle () != -1) {
-	//ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (m_filename.c_str(), mftp::QUERY_TYPE), true, true, sender, converter));
+	mftp::file file (m_filename, FILE_TYPE);
+	
+	mftp::fileid copy = file.get_mfileid ().get_fileid ();
+	
+	copy.convert_to_network ();
+	
+	uint32_t size = strlen (m_sharename);
+	
+	ioa::buffer buff (sizeof (mftp::fileid) + size * sizeof (char));
+	
+	memcpy (buff.data (), &copy, sizeof (mftp::fileid));
+	memcpy (static_cast<char*>(buff.data ()) + sizeof(mftp::fileid), m_sharename, size);
+	
+	mftp::file meta (buff.data (), buff.size (), META_TYPE);
+	
+	ioa::automaton_manager<mftp::mftp_automaton>* file_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, false, true, sender->get_handle(), converter->get_handle()));
+	
+	ioa::automaton_manager<mftp::mftp_automaton>* meta_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, true, false, sender->get_handle (), converter->get_handle ()));
+
       }
     }
   }

@@ -43,9 +43,10 @@ public:
 			       receiver, &ioa::udp_receiver_automaton::receive,
 			       converter, &conversion_channel_automaton::receive_buffer);
 
-    ioa::make_binding_manager (this,
+    /*ioa::make_binding_manager (this,
 			       converter, &conversion_channel_automaton::pass_message,
 			       &m_self, &mftp_client_automaton::receive);
+    */
     
   }
 private:
@@ -63,15 +64,75 @@ private:
 
     if (sender != 0 && converter != 0) {
       if (sender->get_handle () != -1 && converter->get_handle () != -1) {
-	//ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (m_filename.c_str(), mftp::QUERY_TYPE), true, true, sender->get_handle(), converter->get_handle()));
-	mftp::file f (m_filename.c_str (), QUERY_TYPE);
-	ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, true, true, sender->get_handle (), converter->get_handle () ) );
+	uint32_t size = strlen(m_filename.c_str ());
+	ioa::buffer buff (size * sizeof (char));
+	memcpy (buff.data (), m_filename.c_str (), size);
+	mftp::file f (buff.data (), buff.size (), QUERY_TYPE);
+
+	//mftp::file f (m_filename.c_str (), QUERY_TYPE);
+	ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, true, true, sender->get_handle (), converter->get_handle ()));
+
+	ioa::make_binding_manager (this,
+				   query, &mftp::mftp_automaton::match_complete,
+				   &m_self, &mftp_client_automaton::match_complete);
       }
     }
   }
+  
+  void match_complete_effect (const ioa::const_shared_ptr<mftp::file>& f) {
+    //process_meta_file (f);
+    if (f->get_mfileid ().get_original_length () > sizeof (mftp::fileid)) {
+      std::string s (reinterpret_cast<const char*> (f->get_data_ptr ()) + sizeof (mftp::fileid), f->get_mfileid ().get_original_length () - sizeof (mftp::fileid));
+      
+      if (s == m_filename){
+	mftp::fileid fid;
+	memcpy (&fid, f->get_data_ptr (), sizeof (mftp::fileid));
+	fid.convert_to_host();
+	
+	ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid),false,false,sender->get_handle(), converter->get_handle()));
+	
+	ioa::make_binding_manager (this,
+				   file_home, &mftp::mftp_automaton::download_complete,
+				   &m_self, &mftp_client_automaton::file_complete);
+      }	
+    }
+  }
+  
+public:
+  V_UP_INPUT (mftp_client_automaton, match_complete, ioa::const_shared_ptr<mftp::file>);
+  
+private:
+  void file_complete_effect (const mftp::file& f, ioa::aid_t){
+    std::string path (m_filename + "-" + f.get_mfileid ().get_fileid ().to_string ());
+    // TODO:  Add error checking.
+    FILE* fp = fopen (path.c_str (), "w");
+    fwrite (f.get_data_ptr (), 1, f.get_mfileid ().get_original_length (), fp);
+    fclose (fp);
+    std::cout << "Created " << path << std::endl;
+  }
+  
+public:
+  V_AP_INPUT (mftp_client_automaton, file_complete, mftp::file);
+  
+};
 
-  void receive_effect (const ioa::const_shared_ptr<mftp::message>& m){
-    /*
+int main (int argc, char* argv[]) {
+  if (argc != 2){
+    std::cerr << "Usage: " << argv[0] << " FILE" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  
+  std::string fname (argv[1]);
+  
+  ioa::global_fifo_scheduler sched;
+  ioa::run (sched, ioa::make_generator<mftp_client_automaton> (fname));
+  return 0;
+}
+
+
+
+  /* void receive_effect (const ioa::const_shared_ptr<mftp::message>& m){
+
     if (m->header.message_type == mftp::FRAGMENT) {
       if (m->frag.fid.type == META_TYPE && meta_files.count (m->frag.fid) == 0) {
 	mftp::file f (m->frag.fid);
@@ -104,78 +165,27 @@ private:
 	}
 	meta_files.insert(m->frag.fid);
       }
+    }  
     }
-    */
-  }
   
 public:
-  V_UP_INPUT (mftp_client_automaton, receive, ioa::const_shared_ptr<mftp::message>);
-  
-private:
-  void process_meta_file (const mftp::file& f) {
-    /*   if (f.get_mfileid ().get_original_length () > sizeof (mftp::fileid)) {
-      std::string s (reinterpret_cast<const char*> (f.get_data_ptr ()) + sizeof (mftp::fileid), f.get_mfileid ().get_original_length () - sizeof (mftp::fileid));
+    V_UP_INPUT (mftp_client_automaton, receive, ioa::const_shared_ptr<mftp::message>);
+  */  
+
+  /*void process_meta_file (const ioa::const_shared_ptr<mftp::file>& f) {
+    if (f->get_mfileid ().get_original_length () > sizeof (mftp::fileid)) {
+      std::string s (reinterpret_cast<const char*> (f->get_data_ptr ()) + sizeof (mftp::fileid), f->get_mfileid ().get_original_length () - sizeof (mftp::fileid));
       
       if (s == m_filename){
 	mftp::fileid fid;
-	memcpy (&fid, f.get_data_ptr (), sizeof (mftp::fileid));
+	memcpy (&fid, f->get_data_ptr (), sizeof (mftp::fileid));
 	fid.convert_to_host();
 	
-	ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid)));
-	
-	
-	
-	ioa::make_binding_manager (this,
-				   file_home, &mftp::mftp_automaton::send,
-				   sender, &ioa::udp_sender_automaton::send);
-	
-	ioa::make_binding_manager (this,
-				   sender, &ioa::udp_sender_automaton::send_complete,
-				   file_home, &mftp::mftp_automaton::send_complete);
-	
-	ioa::make_binding_manager (this,
-				   converter, &conversion_channel_automaton::pass_message,
-				   file_home, &mftp::mftp_automaton::receive);
+	ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid),false,false,sender->get_handle(), converter->get_handle()));
 	
 	ioa::make_binding_manager (this,
 				   file_home, &mftp::mftp_automaton::download_complete,
 				   &m_self, &mftp_client_automaton::file_complete);
       }	
-    }
-    */
-  }
-
-  void meta_complete_effect (const mftp::file& f, ioa::aid_t) {
-    process_meta_file (f);
-  }
-  
-public:
-  V_AP_INPUT (mftp_client_automaton, meta_complete, mftp::file);
-  
-private:
-  void file_complete_effect (const mftp::file& f, ioa::aid_t){
-    std::string path (m_filename + "-" + f.get_mfileid ().get_fileid ().to_string ());
-    // TODO:  Add error checking.
-    FILE* fp = fopen (path.c_str (), "w");
-    fwrite (f.get_data_ptr (), 1, f.get_mfileid ().get_original_length (), fp);
-    fclose (fp);
-    std::cout << "Created " << path << std::endl;
-  }
-  
-public:
-  V_AP_INPUT (mftp_client_automaton, file_complete, mftp::file);
-  
-};
-
-int main (int argc, char* argv[]) {
-  if (argc != 2){
-    std::cerr << "Usage: " << argv[0] << " FILE" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  
-  std::string fname (argv[1]);
-  
-  ioa::global_fifo_scheduler sched;
-  ioa::run (sched, ioa::make_generator<mftp_client_automaton> (fname));
-  return 0;
-}
+    }  
+    }*/

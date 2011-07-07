@@ -32,7 +32,7 @@ namespace mftp {
 	  const uint32_t);
     file (const fileid& f);
     file (const file& other);
-    file (const void* ptr, uint32_t size);
+    file (const void* ptr, uint32_t size, uint32_t type);
     ~file ();
     
     const mfileid& get_mfileid () const;

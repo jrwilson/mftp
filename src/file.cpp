@@ -110,10 +110,10 @@ namespace mftp {
     memcpy (m_data, other.m_data, final_length);
   }
 
-  file::file (const void* ptr, uint32_t size)
+  file::file (const void* ptr, uint32_t size, uint32_t type)
   {
     m_mfileid.set_length (size);
-    m_mfileid.set_type (META_TYPE);
+    m_mfileid.set_type (type);
     m_have_count = m_mfileid.get_fragment_count ();
     m_valid_count = m_mfileid.get_fragment_count ();
     m_have.resize (m_mfileid.get_fragment_count ());
