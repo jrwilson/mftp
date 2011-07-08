@@ -1,4 +1,5 @@
 #include "mftp_automaton.hpp"
+#include "jam.hpp"
 #include "conversion_channel_automaton.hpp"
 #include <ioa/udp_sender_automaton.hpp>
 #include <ioa/udp_receiver_automaton.hpp>

@@ -12,7 +12,6 @@
 #include <stdio.h>
 
 namespace mftp {
-
   const size_t HASH_SIZE = 32;
   const size_t FRAGMENT_SIZE = 512;
 
@@ -404,7 +403,6 @@ namespace mftp {
       msg.convert_to_host ();
     }
   };
-
 }
 
 #endif

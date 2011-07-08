@@ -16,8 +16,16 @@
 #include <cstring>
 #include <math.h>
 
-namespace mftp {
 
+struct interesting_file_predicate {
+  virtual bool operator() (const mftp::fileid& fid) = 0;
+};
+
+struct matching_file_predicate {
+  virtual bool operator() (const mftp::file& f, const char* fname) = 0;
+};
+
+namespace mftp {
   class mftp_automaton :
     public ioa::automaton
   {
