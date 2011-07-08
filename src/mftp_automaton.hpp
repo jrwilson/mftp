@@ -69,8 +69,13 @@ namespace mftp {
     ioa::handle_manager<ioa::udp_sender_automaton> m_sender;
     ioa::handle_manager<conversion_channel_automaton> m_converter;
 
+    interesting_file_predicate* m_ifp;
+    matching_file_predicate* m_mfp;
+    interesting_file_predicate* IFNULLPTR;
+    matching_file_predicate* MFNULLPTR;
+
   public:
-    mftp_automaton (const file& file, bool matching, bool returning, const ioa::automaton_handle<ioa::udp_sender_automaton>& sender, const ioa::automaton_handle<conversion_channel_automaton>& converter) :
+    mftp_automaton (const file& file, bool matching, bool returning, const ioa::automaton_handle<ioa::udp_sender_automaton>& sender, const ioa::automaton_handle<conversion_channel_automaton>& converter, interesting_file_predicate* ifp, matching_file_predicate* mfp) :
       m_fragment_interval (0, 1000), // 1000 microseconds = 1 millisecond
       m_request_interval (1, 0), // 1 second
       m_announcement_interval (7, 0), // 7 seconds
@@ -92,6 +97,9 @@ namespace mftp {
       m_sender (sender),
       m_converter (converter)
     {
+      m_ifp = ifp;
+      m_mfp = mfp;      
+
       ioa::make_binding_manager (this,
 				 &m_self, &mftp_automaton::send,
 				 &m_sender, &ioa::udp_sender_automaton::send);
@@ -249,14 +257,11 @@ namespace mftp {
 	  }
 
 	  //Otherwise, we could be looking for files that might match our file.
-
-	  //if ((m_fileid.type == META_TYPE && m.fid.type == QUERY_TYPE) && (m_fileid.type == QUERY_TYPE && m.fid.type == META_TYPE)) {       FIXME:  this if statement should be part of the interesting functor	    
-	    //If we are matching, we have not already checked this one AND it is interesting:
+	  //If we are matching, we have not already checked this one AND it is interesting:
 	  if (m_matching &&
 	      matches.count (m->frag.fid) == 0 &&
 	      non_matches.count (m->frag.fid) == 0 &&
-	      
-	      /*it is interesting*/ true) {
+	      (*m_ifp)(m->frag.fid)) {
 
 	    //We have probably already received the whole file.
 	    file f (m->frag.fid);
@@ -267,7 +272,7 @@ namespace mftp {
 	    }
 	    //Create mftp_automaton with MATCHING FALSE to download other file, when download completes, perform matching
 	    else {
-	      ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (m->frag.fid), false, false, m_sender.get_handle(), m_converter.get_handle()));
+	      ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (m->frag.fid), false, false, m_sender.get_handle(), m_converter.get_handle(), IFNULLPTR, MFNULLPTR));
 	      
 	      ioa::make_binding_manager (this,
 					 new_file_home, &mftp_automaton::download_complete,
@@ -495,7 +500,8 @@ namespace mftp {
 
 
     void process_matching_file (const file& f) {
-      if (/*MATCHING FUNCTOR APPLIED TO f*/ true){
+      //ERROR HERE FOR FILENAME
+      if (matches.count (f.get_mfileid ().get_fileid ()) > 0 || (*m_mfp)(f, m_filename)) {
 	matches.insert(f.get_mfileid ().get_fileid ());
 	matching_files.push (ioa::const_shared_ptr<file> (new file (f)));
       }

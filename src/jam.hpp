@@ -12,13 +12,17 @@ namespace jam {
 #define META_TYPE 1
 #define QUERY_TYPE 2    
 
-  class query_file_predicate:
-    public interesting_file_predicate,
-    public matching_file_predicate {
+  class interesting_query_predicate:
+    public interesting_file_predicate {
   public:
     virtual bool operator() (const mftp::fileid& fid) {
       return fid.type == META_TYPE;
     }
+  };
+    
+  class matching_query_predicate :
+    public matching_file_predicate {
+  public:
     virtual bool operator() (const mftp::file& f, const char* fname) {
       uint32_t size = f.get_mfileid ().get_original_length () - sizeof (mftp::fileid);
       char other[size];
@@ -26,13 +30,17 @@ namespace jam {
       return strcmp (other, fname) == 0;
     }
   };
-
-  class meta_file_predicate : 
-    public interesting_file_predicate,
-    public matching_file_predicate {
+  
+  class interesting_meta_predicate : 
+    public interesting_file_predicate {
+  public:
     virtual bool operator() (const mftp::fileid& fid) {
       return fid.type == QUERY_TYPE;
     }
+  };
+  
+  class matching_meta_predicate :
+    public matching_file_predicate {
     virtual bool operator() (const mftp::file& f, const char* fname) {
       uint32_t size = f.get_mfileid ().get_original_length ();
       char other[size];
@@ -40,6 +48,7 @@ namespace jam {
       return strcmp (other, fname) == 0;
     }
   };
+
 }
 
 #endif

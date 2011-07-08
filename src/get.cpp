@@ -19,10 +19,17 @@ private:
   ioa::automaton_manager<conversion_channel_automaton>* converter;
   std::string m_filename;
 
+  jam::interesting_query_predicate* iqp;
+  jam::matching_query_predicate* mqp;
+  interesting_file_predicate* IFNULLPTR;
+  matching_file_predicate* MFNULLPTR;
+
 public:
   mftp_client_automaton (std::string fname) :
     m_self (ioa::get_aid ()),
-    m_filename (fname)
+    m_filename (fname),
+    IFNULLPTR (0),
+    MFNULLPTR (0)
   {
     const std::string address = "0.0.0.0";
     const std::string mc_address = "224.0.0.137";
@@ -71,7 +78,7 @@ private:
 	mftp::file f (buff.data (), buff.size (), QUERY_TYPE);
 
 	//mftp::file f (m_filename.c_str (), QUERY_TYPE);
-	ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, true, true, sender->get_handle (), converter->get_handle ()));
+	ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, true, true, sender->get_handle (), converter->get_handle (), iqp, mqp));
 
 	ioa::make_binding_manager (this,
 				   query, &mftp::mftp_automaton::match_complete,
@@ -90,7 +97,7 @@ private:
 	memcpy (&fid, f->get_data_ptr (), sizeof (mftp::fileid));
 	fid.convert_to_host();
 	
-	ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid),false,false,sender->get_handle(), converter->get_handle()));
+	ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid),false,false,sender->get_handle(), converter->get_handle(), IFNULLPTR, MFNULLPTR));
 	
 	ioa::make_binding_manager (this,
 				   file_home, &mftp::mftp_automaton::download_complete,

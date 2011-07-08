@@ -16,10 +16,19 @@ class mftp_server_automaton :
 private:
   ioa::automaton_manager<ioa::udp_sender_automaton>* sender;
   ioa::automaton_manager<conversion_channel_automaton>* converter;
+
+  jam::interesting_meta_predicate* imp;
+  jam::matching_meta_predicate* mmp;
+  interesting_file_predicate* IFNULLPTR;
+  matching_file_predicate* MFNULLPTR;
+
   const char* m_filename;
   const char* m_sharename;
+
 public:
   mftp_server_automaton (const char* fname, const char* sname):
+    IFNULLPTR (0),
+    MFNULLPTR (0),
     m_filename (fname),
     m_sharename (sname)
   {
@@ -75,9 +84,9 @@ public:
 	
 	mftp::file meta (buff.data (), buff.size (), META_TYPE);
 	
-	ioa::automaton_manager<mftp::mftp_automaton>* file_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, false, true, sender->get_handle(), converter->get_handle()));
+	ioa::automaton_manager<mftp::mftp_automaton>* file_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, false, true, sender->get_handle(), converter->get_handle(),IFNULLPTR, MFNULLPTR));
 	
-	ioa::automaton_manager<mftp::mftp_automaton>* meta_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, true, false, sender->get_handle (), converter->get_handle ()));
+	ioa::automaton_manager<mftp::mftp_automaton>* meta_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, true, false, sender->get_handle (), converter->get_handle (), imp, mmp));
 
       }
     }
