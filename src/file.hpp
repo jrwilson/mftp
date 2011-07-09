@@ -24,7 +24,7 @@ namespace mftp {
     void validate (const uint32_t);
 
   public:
-    file (const char*,
+    file (const std::string&,
 	  const uint32_t);
     file (const fileid& f);
     file (const file& other);
@@ -32,13 +32,13 @@ namespace mftp {
     ~file ();
     
     const mfileid& get_mfileid () const;
-    unsigned char* get_data_ptr ();
-    const unsigned char* get_data_ptr () const;
+    void* get_data_ptr ();
+    const void* get_data_ptr () const;
     bool complete () const;
     bool empty () const;
     bool have (const uint32_t offset) const;
     void write_chunk (const uint32_t offset,
-		      const uint8_t* data);
+		      const void* data);
     span_t get_next_range ();
     uint32_t get_random_index () const;
   };

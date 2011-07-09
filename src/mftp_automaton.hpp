@@ -16,24 +16,31 @@
 #include <cstring>
 #include <math.h>
 
-
-struct interesting_file_predicate {
-  virtual bool operator() (const mftp::fileid& fid) = 0;
-};
-
-struct matching_file_predicate {
-  virtual bool operator() (const mftp::file& f, const char* fname) = 0;
-};
+// TODO:  Are we rotating through the matches??
+// TODO:  Timeout for matches.
 
 namespace mftp {
+  
+  struct match_candidate_predicate {
+    virtual ~match_candidate_predicate () { }
+    virtual bool operator() (const mftp::fileid& fid) const = 0;
+    virtual match_candidate_predicate* clone () const = 0;
+  };
+  
+  struct match_predicate {
+    virtual ~match_predicate () { }
+    virtual bool operator() (const mftp::file& f) const = 0;
+    virtual match_predicate* clone () const = 0;
+  };
+  
   class mftp_automaton :
     public ioa::automaton
   {
   private:
-    const ioa::time m_fragment_interval;
-    const ioa::time m_request_interval;
-    const ioa::time m_announcement_interval;
-    const ioa::time m_matching_interval;
+    static const ioa::time FRAGMENT_INTERVAL;
+    static const ioa::time REQUEST_INTERVAL;
+    static const ioa::time ANNOUNCEMENT_INTERVAL;
+    static const ioa::time MATCHING_INTERVAL;
 
     enum send_state_t {
       SEND_READY,
@@ -49,57 +56,29 @@ namespace mftp {
     file m_file;
     const mfileid& m_mfileid;
     const fileid& m_fileid;
-    std::vector<bool> m_their_req;
-    uint32_t m_their_req_count;
+    std::vector<bool> m_requests; // Bit vector indicating fragments that have been requested.
+    uint32_t m_requests_count; // Number of true elements in m_requests.
     std::queue<ioa::const_shared_ptr<message_buffer> > m_sendq;
     send_state_t m_send_state;
     timer_state_t m_fragment_timer_state;
     timer_state_t m_request_timer_state;
     timer_state_t m_announcement_timer_state;
     timer_state_t m_matching_timer_state;
-    bool m_reported;
-    bool m_matching;
-    bool m_returning_files;
-
-    std::set<fileid> matches;
-    std::set<fileid> non_matches;
-
-    std::queue<ioa::const_shared_ptr<file> > matching_files;
-
+    bool m_reported; // True when we have reported a complete download.
     ioa::handle_manager<ioa::udp_sender_automaton> m_sender;
     ioa::handle_manager<conversion_channel_automaton> m_converter;
 
-    interesting_file_predicate* m_ifp;
-    matching_file_predicate* m_mfp;
-    interesting_file_predicate* IFNULLPTR;
-    matching_file_predicate* MFNULLPTR;
+    const bool m_matching; // Try to find matches for this file.
+    std::auto_ptr<match_candidate_predicate> m_match_candidate_predicate;
+    std::auto_ptr<match_predicate> m_match_predicate;
 
-  public:
-    mftp_automaton (const file& file, bool matching, bool returning, const ioa::automaton_handle<ioa::udp_sender_automaton>& sender, const ioa::automaton_handle<conversion_channel_automaton>& converter, interesting_file_predicate* ifp, matching_file_predicate* mfp) :
-      m_fragment_interval (0, 1000), // 1000 microseconds = 1 millisecond
-      m_request_interval (1, 0), // 1 second
-      m_announcement_interval (7, 0), // 7 seconds
-      m_matching_interval (5, 0), //5 seconds
-      m_self (ioa::get_aid ()),
-      m_file (file),
-      m_mfileid (file.get_mfileid ()),
-      m_fileid (m_mfileid.get_fileid ()),
-      m_their_req (m_mfileid.get_fragment_count ()),
-      m_their_req_count (0),
-      m_send_state (SEND_READY),
-      m_fragment_timer_state (SET_READY),
-      m_request_timer_state (SET_READY),
-      m_announcement_timer_state (SET_READY),
-      m_matching_timer_state (SET_READY),
-      m_reported (m_file.complete ()),
-      m_matching (matching),
-      m_returning_files (returning),
-      m_sender (sender),
-      m_converter (converter)
-    {
-      m_ifp = ifp;
-      m_mfp = mfp;      
+    std::set<fileid> m_pending_matches;
+    std::set<fileid> m_matches;
+    std::set<fileid> m_non_matches;
 
+    std::queue<ioa::const_shared_ptr<file> > m_matching_files;
+
+    void create_bindings () {
       ioa::make_binding_manager (this,
 				 &m_self, &mftp_automaton::send,
 				 &m_sender, &ioa::udp_sender_automaton::send);
@@ -166,33 +145,77 @@ namespace mftp {
       schedule ();
     }
 
+  public:
+    // Not matching.
+    mftp_automaton (const file& file,
+		    const ioa::automaton_handle<ioa::udp_sender_automaton>& sender,
+		    const ioa::automaton_handle<conversion_channel_automaton>& converter) :
+      m_self (ioa::get_aid ()),
+      m_file (file),
+      m_mfileid (file.get_mfileid ()),
+      m_fileid (m_mfileid.get_fileid ()),
+      m_requests (m_mfileid.get_fragment_count ()),
+      m_requests_count (0),
+      m_send_state (SEND_READY),
+      m_fragment_timer_state (SET_READY),
+      m_request_timer_state (SET_READY),
+      m_announcement_timer_state (SET_READY),
+      m_matching_timer_state (SET_READY),
+      m_reported (m_file.complete ()),
+      m_sender (sender),
+      m_converter (converter),
+      m_matching (false)
+    {
+      create_bindings ();
+    }
+
+    // Matching.
+    mftp_automaton (const file& file,
+		    const ioa::automaton_handle<ioa::udp_sender_automaton>& sender,
+		    const ioa::automaton_handle<conversion_channel_automaton>& converter,
+		    const match_candidate_predicate& match_candidate_pred,
+		    const match_predicate& match_pred) :
+      m_self (ioa::get_aid ()),
+      m_file (file),
+      m_mfileid (file.get_mfileid ()),
+      m_fileid (m_mfileid.get_fileid ()),
+      m_requests (m_mfileid.get_fragment_count ()),
+      m_requests_count (0),
+      m_send_state (SEND_READY),
+      m_fragment_timer_state (SET_READY),
+      m_request_timer_state (SET_READY),
+      m_announcement_timer_state (SET_READY),
+      m_matching_timer_state (SET_READY),
+      m_reported (m_file.complete ()),
+      m_sender (sender),
+      m_converter (converter),
+      m_matching (true),
+      m_match_candidate_predicate (match_candidate_pred.clone ()),
+      m_match_predicate (match_pred.clone ())
+    {
+      create_bindings ();
+    }
+
   private:
     void schedule () const {
       if (send_precondition ()) {
 	ioa::schedule (&mftp_automaton::send);
       }
-
       if (set_fragment_timer_precondition ()) {
 	ioa::schedule (&mftp_automaton::set_fragment_timer);
       }
-
       if (set_request_timer_precondition ()) {
 	ioa::schedule (&mftp_automaton::set_request_timer);
       }
-
       if (set_announcement_timer_precondition ()) {
 	ioa::schedule (&mftp_automaton::set_announcement_timer);
       }
-
-      if (m_matching){
-	if (match_complete_precondition ()){
-	  ioa::schedule (&mftp_automaton::match_complete);
-	}
-	if (set_match_timer_precondition ()) {
-	  ioa::schedule (&mftp_automaton::set_match_timer);
-	}
+      if (set_match_timer_precondition ()) {
+	ioa::schedule (&mftp_automaton::set_match_timer);
       }
-      
+      if (match_complete_precondition ()){
+	ioa::schedule (&mftp_automaton::match_complete);
+      }
       if (download_complete_precondition ()) {
 	ioa::schedule (&mftp_automaton::download_complete);
       }
@@ -203,7 +226,7 @@ namespace mftp {
     }
 
     ioa::udp_sender_automaton::send_arg send_effect () {
-      std::cout << __func__ << ": sendq size is " << m_sendq.size () << std::endl;
+      // TODO:  This should be generalized.
       ioa::inet_address a ("224.0.0.137", 54321);
       ioa::const_shared_ptr<message_buffer> m = m_sendq.front ();
       m_sendq.pop ();
@@ -249,30 +272,33 @@ namespace mftp {
 	    m_file.write_chunk (m->frag.offset, m->frag.data);
 	    
 	    uint32_t idx = (m->frag.offset / FRAGMENT_SIZE);
-	    if (m_their_req[idx]) {
+	    if (m_requests[idx]) {
 	      // Somebody else wanted it and now has just seen it.
-	      m_their_req[idx] = false;
-	      --m_their_req_count;
+	      m_requests[idx] = false;
+	      --m_requests_count;
 	    }
 	  }
 
-	  //Otherwise, we could be looking for files that might match our file.
-	  //If we are matching, we have not already checked this one AND it is interesting:
+	  // Otherwise, we could be looking for files that might match our file.
+	  // If we are matching, we have not already checked this one AND it is interesting:
 	  if (m_matching &&
-	      matches.count (m->frag.fid) == 0 &&
-	      non_matches.count (m->frag.fid) == 0 &&
-	      (*m_ifp)(m->frag.fid)) {
+	      m_pending_matches.count (m->frag.fid) == 0 &&
+	      m_matches.count (m->frag.fid) == 0 &&
+	      m_non_matches.count (m->frag.fid) == 0 &&
+	      (*m_match_candidate_predicate) (m->frag.fid)) {
 
-	    //We have probably already received the whole file.
+	    m_pending_matches.insert (m->frag.fid);
+
 	    file f (m->frag.fid);
 	    f.write_chunk (m->frag.offset, m->frag.data);
 	    if (f.complete()) {
-	      
-	      process_matching_file (f);
+	      // We received the whole file.
+	      process_match_candidate (f);
 	    }
-	    //Create mftp_automaton with MATCHING FALSE to download other file, when download completes, perform matching
 	    else {
-	      ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (m->frag.fid), false, false, m_sender.get_handle(), m_converter.get_handle(), IFNULLPTR, MFNULLPTR));
+	      // Create an mftp_automaton with MATCHING FALSE to download other file.
+	      // Perform matching the download is complete.
+	      ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle()));
 	      
 	      ioa::make_binding_manager (this,
 					 new_file_home, &mftp_automaton::download_complete,
@@ -284,7 +310,6 @@ namespace mftp {
 	
       case REQUEST:
 	{
-	  std::cout << "Received a request." << std::endl;
 	  //Requests must be for our file.
 	  if (m->req.fid == m_fileid){
 	    for (uint32_t sp = 0; sp < m->req.span_count; sp++){
@@ -298,9 +323,9 @@ namespace mftp {
 		     offset < m->req.spans[sp].stop;
 		     offset += FRAGMENT_SIZE) {
 		  uint32_t idx = offset / FRAGMENT_SIZE;
-		  if (m_file.have (offset) && !m_their_req[idx]) {
-		    m_their_req[idx] = true;
-		    ++m_their_req_count;
+		  if (m_file.have (offset) && !m_requests[idx]) {
+		    m_requests[idx] = true;
+		    ++m_requests_count;
 		  }
 		}
 	      }
@@ -312,13 +337,12 @@ namespace mftp {
       case MATCH:
 	{
 	  //TODO:  learning matches from others.
-
-
+	  std::cout << "MATCH" << std::endl;
 	}
 	break;
 
       default:
-	// Unkown message type.
+	// Unknown message type.
 	break;
       }
       
@@ -330,26 +354,23 @@ namespace mftp {
 
   private:
     bool set_fragment_timer_precondition () const {
-      return m_fragment_timer_state == SET_READY && m_their_req_count != 0 && ioa::binding_count (&mftp_automaton::set_fragment_timer) != 0;
+      return m_fragment_timer_state == SET_READY && m_requests_count != 0 && ioa::binding_count (&mftp_automaton::set_fragment_timer) != 0;
     }
 
     ioa::time set_fragment_timer_effect () {
       m_fragment_timer_state = INTERRUPT_WAIT;
-      return m_fragment_interval;
+      return FRAGMENT_INTERVAL;
     }
 
     V_UP_OUTPUT (mftp_automaton, set_fragment_timer, ioa::time);
 
     void fragment_timer_interrupt_effect () {
-      std::cout << __func__ << std::endl;
       // Purpose is to produce a randomly selected requested fragment.
-      std::cout << m_their_req_count << std::endl;
-      if (m_their_req_count != 0 && m_sendq.empty()) {
-	std::cout << "decided to send fragment" << std::endl;
+      if (m_requests_count != 0 && m_sendq.empty()) {
 	// Get a random index.
 	uint32_t randy = get_random_request_index ();
-	m_their_req[randy] = false;
-	--m_their_req_count;
+	m_requests[randy] = false;
+	--m_requests_count;
 
 	// Get the fragment for that index.
 	message_buffer* m = get_fragment (randy);
@@ -368,13 +389,12 @@ namespace mftp {
 
     ioa::time set_request_timer_effect () {
       m_request_timer_state = INTERRUPT_WAIT;
-      return m_request_interval;
+      return REQUEST_INTERVAL;
     }
 
     V_UP_OUTPUT (mftp_automaton, set_request_timer, ioa::time);
 
     void request_timer_interrupt_effect () {
-      std::cout << __func__ << std::endl;
       if (m_sendq.empty () && !m_file.complete ()) {
 	span_t spans[64];
 	spans[0] = m_file.get_next_range();
@@ -406,13 +426,12 @@ namespace mftp {
 
     ioa::time set_announcement_timer_effect () {
       m_announcement_timer_state = INTERRUPT_WAIT;
-      return m_announcement_interval;
+      return ANNOUNCEMENT_INTERVAL;
     }
 
     V_UP_OUTPUT (mftp_automaton, set_announcement_timer, ioa::time);
     
     void announcement_timer_interrupt_effect () {
-      std::cout << __func__ << std::endl;
       if (!m_file.empty () && m_sendq.empty()) {
 	message_buffer* m = get_fragment (m_file.get_random_index ());
 	m->convert_to_network ();
@@ -424,61 +443,61 @@ namespace mftp {
     UV_UP_INPUT (mftp_automaton, announcement_timer_interrupt);
 
     bool set_match_timer_precondition () const {
-      return m_matching_timer_state == SET_READY && ioa::binding_count (&mftp_automaton::set_match_timer) != 0;
+      return m_matching && m_matching_timer_state == SET_READY && ioa::binding_count (&mftp_automaton::set_match_timer) != 0;
     }
 
     ioa::time set_match_timer_effect () {
       m_matching_timer_state = INTERRUPT_WAIT;
-      return m_matching_interval;
+      return MATCHING_INTERVAL;
     }
 
     V_UP_OUTPUT (mftp_automaton, set_match_timer, ioa::time);
 
-
     void matching_timer_interrupt_effect () {
       std::cout << __func__ << std::endl;
-      if (!matches.empty () && m_sendq.empty()){
-	size_t count = matches.size();
-	fileid mats[12];
-	if (count > 12){
-	  count = 12;
-	  srand ((unsigned) time (0));
-	  uint32_t idx = rand () % matches.size();
+
+      // if (!m_matches.empty () && m_sendq.empty()){
+      // 	size_t count = m_matches.size();
+      // 	fileid mats[12];
+      // 	if (count > 12){
+      // 	  count = 12;
+      // 	  srand ((unsigned) time (0));
+      // 	  uint32_t idx = rand () % m_matches.size();
 	  
-	  std::set<fileid>::iterator it = matches.begin ();
-	  for (uint32_t i = 0; i < idx; i++) { ++it; }
+      // 	  std::set<fileid>::iterator it = m_matches.begin ();
+      // 	  for (uint32_t i = 0; i < idx; i++) { ++it; }
 
-	  for (uint32_t j = 0; j < count; ++j) {
-	    if (it == matches.end ()) {
-	      mats[j] = *it;
-	      it = matches.begin ();
-	    } 
-	    else {
-	      mats[j] = *it;
-	      ++it;
-	    }
-	  }
-	}
-	else {
-	  uint32_t i = 0;
-	  for (std::set<fileid>::iterator it = matches.begin ();
-	       it != matches.end (); 
-	       ++it) {
-	    mats[i] = *it;
-	    ++i;
-	  }
-	}
-	message_buffer* m = new message_buffer (match_type (), m_fileid, static_cast<uint32_t>(count), mats);
+      // 	  for (uint32_t j = 0; j < count; ++j) {
+      // 	    if (it == m_matches.end ()) {
+      // 	      mats[j] = *it;
+      // 	      it = m_matches.begin ();
+      // 	    } 
+      // 	    else {
+      // 	      mats[j] = *it;
+      // 	      ++it;
+      // 	    }
+      // 	  }
+      // 	}
+      // 	else {
+      // 	  uint32_t i = 0;
+      // 	  for (std::set<fileid>::iterator it = m_matches.begin ();
+      // 	       it != m_matches.end (); 
+      // 	       ++it) {
+      // 	    mats[i] = *it;
+      // 	    ++i;
+      // 	  }
+      // 	}
+      // 	message_buffer* m = new message_buffer (match_type (), m_fileid, static_cast<uint32_t>(count), mats);
 
-	m->convert_to_network ();
-	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
-      }
+      // 	m->convert_to_network ();
+      // 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+      // }
+
       m_matching_timer_state = SET_READY;
     }
 
     UV_UP_INPUT (mftp_automaton, matching_timer_interrupt);
     
-
     bool download_complete_precondition () const {
       return m_file.complete () && !m_reported && ioa::binding_count (&mftp_automaton::download_complete) != 0;
     }
@@ -492,33 +511,35 @@ namespace mftp {
     V_UP_OUTPUT (mftp_automaton, download_complete, file);
 
   private:
-    void match_download_complete_effect (const file& f) {      //For use when the child has reported a download_complete.
-      process_matching_file (f);
+    void match_download_complete_effect (const file& f,
+					 ioa::aid_t aid) {      //For use when the child has reported a download_complete.
+      process_match_candidate (f);
+      // TODO:  Destroy the mftp_automaton that provided us with the file.
     }
 
-    V_UP_INPUT (mftp_automaton, match_download_complete, file);
+    V_AP_INPUT (mftp_automaton, match_download_complete, file);
 
+    void process_match_candidate (const file& f) {
+      // Remove from pending.
+      fileid fid = f.get_mfileid ().get_fileid ();
+      m_pending_matches.erase (fid);
 
-    void process_matching_file (const file& f) {
-      //ERROR HERE FOR FILENAME
-      if (matches.count (f.get_mfileid ().get_fileid ()) > 0 || (*m_mfp)(f, m_filename)) {
-	matches.insert(f.get_mfileid ().get_fileid ());
-	matching_files.push (ioa::const_shared_ptr<file> (new file (f)));
+      if ((*m_match_predicate) (f)) {
+	m_matches.insert (fid);
+	m_matching_files.push (ioa::const_shared_ptr<file> (new file (f)));
       }
-      else{
-	non_matches.insert(f.get_mfileid ().get_fileid ());
+      else {
+	m_non_matches.insert (fid);
       }
     }
-
 
     bool match_complete_precondition () const {
-      return !matching_files.empty () && ioa::binding_count (&mftp_automaton::match_complete) != 0;
+      return !m_matching_files.empty () && ioa::binding_count (&mftp_automaton::match_complete) != 0;
     }
 
-    ioa::const_shared_ptr<file> match_complete_effect () {    //For use when a match has been found and the Client needs to know.
-      std::cout << __func__ << std::endl;
-      ioa::const_shared_ptr<file> f = matching_files.front ();
-      matching_files.pop ();
+    ioa::const_shared_ptr<file> match_complete_effect () {
+      ioa::const_shared_ptr<file> f = m_matching_files.front ();
+      m_matching_files.pop ();
       return f;
     }
 
@@ -527,18 +548,23 @@ namespace mftp {
 
   private:
     uint32_t get_random_request_index () {
-      assert (m_their_req_count != 0);
-      uint32_t rf = rand () % m_their_req.size();
-      for (; !m_their_req[rf]; rf = (rf + 1) % m_their_req.size ()) { }
+      assert (m_requests_count != 0);
+      uint32_t rf = rand () % m_requests.size();
+      for (; !m_requests[rf]; rf = (rf + 1) % m_requests.size ()) { }
       return rf;
     }
 
     message_buffer* get_fragment (uint32_t idx) {
       uint32_t offset = idx * FRAGMENT_SIZE;
-      return new message_buffer (fragment_type (), m_fileid, offset, m_file.get_data_ptr() + offset);
+      return new message_buffer (fragment_type (), m_fileid, offset, static_cast<const char*> (m_file.get_data_ptr ()) + offset);
     }
 
   };
+
+  const ioa::time mftp_automaton::FRAGMENT_INTERVAL (0, 1000); // 1000 microseconds = 1 millisecond
+  const ioa::time mftp_automaton::REQUEST_INTERVAL (1, 0); // 1 second
+  const ioa::time mftp_automaton::ANNOUNCEMENT_INTERVAL (7, 0); // 7 seconds
+  const ioa::time mftp_automaton::MATCHING_INTERVAL (5, 0); //5 seconds
 
 }
 

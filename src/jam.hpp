@@ -1,10 +1,7 @@
 #ifndef __jam_hpp__
 #define __jam_hpp__
 
-#include "mftp.hpp"
-#include "file.hpp"
-
-#include <string.h>
+#include "mftp_automaton.hpp"
 
 namespace jam {
 
@@ -12,40 +9,72 @@ namespace jam {
 #define META_TYPE 1
 #define QUERY_TYPE 2    
 
-  class interesting_query_predicate:
-    public interesting_file_predicate {
-  public:
-    virtual bool operator() (const mftp::fileid& fid) {
+  struct meta_predicate :
+    public mftp::match_candidate_predicate
+  {
+    bool operator() (const mftp::fileid& fid) const {
       return fid.type == META_TYPE;
+    }
+
+    meta_predicate* clone () const {
+      return new meta_predicate (*this);
     }
   };
     
-  class matching_query_predicate :
-    public matching_file_predicate {
-  public:
-    virtual bool operator() (const mftp::file& f, const char* fname) {
-      uint32_t size = f.get_mfileid ().get_original_length () - sizeof (mftp::fileid);
-      char other[size];
-      memcpy (other, f.get_data_ptr () + sizeof(mftp::fileid), size);
-      return strcmp (other, fname) == 0;
+  struct meta_filename_predicate :
+    public mftp::match_predicate
+  {
+    std::string filename;
+    
+    meta_filename_predicate (const std::string& fname) :
+      filename (fname)
+    { }
+
+    bool operator() (const mftp::file& f) const {
+      assert (f.get_mfileid ().get_fileid ().type == META_TYPE);
+      if (f.get_mfileid ().get_original_length () >= sizeof (mftp::fileid)) {
+	// We have enough data.
+	// Get the name of the size.
+	const size_t size = f.get_mfileid ().get_original_length () - sizeof (mftp::fileid);
+	return memcmp (filename.c_str (), static_cast<const char*> (f.get_data_ptr ()) + sizeof (mftp::fileid), std::min (filename.size (), size)) == 0;
+      }
+      return false;
     }
+
+    meta_filename_predicate* clone () const {
+      return new meta_filename_predicate (*this);
+    }
+
   };
   
-  class interesting_meta_predicate : 
-    public interesting_file_predicate {
-  public:
-    virtual bool operator() (const mftp::fileid& fid) {
+  struct query_predicate :
+    public mftp::match_candidate_predicate
+  {
+    bool operator() (const mftp::fileid& fid) const {
       return fid.type == QUERY_TYPE;
     }
+
+    query_predicate* clone () const {
+      return new query_predicate (*this);
+    }
   };
   
-  class matching_meta_predicate :
-    public matching_file_predicate {
-    virtual bool operator() (const mftp::file& f, const char* fname) {
-      uint32_t size = f.get_mfileid ().get_original_length ();
-      char other[size];
-      memcpy (other, f.get_data_ptr (), size);
-      return strcmp (other, fname) == 0;
+  struct query_filename_predicate :
+    public mftp::match_predicate
+  {
+    std::string filename;
+
+    query_filename_predicate (const std::string& fname) :
+      filename (fname)
+    { }
+
+    bool operator() (const mftp::file& f) const {
+      assert (f.get_mfileid ().get_fileid ().type == QUERY_TYPE);
+      return memcmp (filename.c_str (), f.get_data_ptr (), std::min (filename.size (), f.get_mfileid ().get_original_length ())) == 0;
+    }
+
+    query_filename_predicate* clone () const {
+      return new query_filename_predicate (*this);
     }
   };
 

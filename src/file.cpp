@@ -11,11 +11,11 @@
 
 namespace mftp {
 
-  file::file (const char* name,
+  file::file (const std::string& name,
 	      const uint32_t type) :
     m_start_idx (0)
   {
-    int fd = open (name, O_RDONLY);
+    int fd = open (name.c_str (), O_RDONLY);
     assert (fd != -1);
 
     struct stat stats;
@@ -166,11 +166,11 @@ namespace mftp {
     return m_mfileid;
   }
   
-  unsigned char* file::get_data_ptr () {
+  void* file::get_data_ptr () {
     return m_data;
   }
 
-  const unsigned char* file::get_data_ptr () const {
+  const void* file::get_data_ptr () const {
     return m_data;
   }
 
@@ -189,7 +189,7 @@ namespace mftp {
   }
 
   void file::write_chunk (const uint32_t offset,
-			  const uint8_t* data) {
+			  const void* data) {
     assert (offset % FRAGMENT_SIZE == 0);
     assert (offset < m_mfileid.get_final_length ());
 

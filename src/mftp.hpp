@@ -65,6 +65,7 @@ namespace mftp {
     }
   };
 
+  // Memoized fileid.
   class mfileid
   {
   private:
@@ -144,19 +145,19 @@ namespace mftp {
       return m_fileid;
     }
 
-    const uint32_t get_original_length () const {
+    const size_t get_original_length () const {
       return m_fileid.length;
     }
 
-    const uint32_t get_fragment_count () const {
+    const size_t get_fragment_count () const {
       return m_fragment_count;
     }
 
-    const uint32_t get_padded_length () const {
+    const size_t get_padded_length () const {
       return m_padded_length;
     }
 
-    const uint32_t get_final_length () const {
+    const size_t get_final_length () const {
       return m_final_length;
     }
 
@@ -297,7 +298,7 @@ namespace mftp {
     message (fragment_type /* */,
 	     const fileid& fileid,
 	     uint32_t offset,
-	     const uint8_t* data)
+	     const void* data)
     {
       header.message_type = FRAGMENT;
       frag.fid = fileid;
@@ -342,6 +343,7 @@ namespace mftp {
 	break;
       case MATCH:
 	mat.convert_to_network ();
+	break;
       }
       header.convert_to_network ();
     }
@@ -369,7 +371,7 @@ namespace mftp {
     message_buffer (fragment_type type,
 		    const fileid& fileid,
 		    uint32_t offset,
-		    const uint8_t* data) :
+		    const void* data) :
       msg (type, fileid, offset, data)
     { }
 
