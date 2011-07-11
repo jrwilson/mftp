@@ -2,10 +2,10 @@
 #define	__mftp_automaton_hpp__
 
 #include "file.hpp"
-#include "conversion_channel_automaton.hpp"
+
+#include "mftp_sender_automaton.hpp"
+#include "mftp_receiver_automaton.hpp"
 #include <ioa/alarm_automaton.hpp>
-#include <ioa/udp_sender_automaton.hpp>
-#include <ioa/udp_receiver_automaton.hpp>
 
 #include <config.hpp>
 #include <cstdlib>
@@ -22,13 +22,13 @@ namespace mftp {
   
   struct match_candidate_predicate {
     virtual ~match_candidate_predicate () { }
-    virtual bool operator() (const mftp::fileid& fid) const = 0;
+    virtual bool operator() (const fileid& fid) const = 0;
     virtual match_candidate_predicate* clone () const = 0;
   };
   
   struct match_predicate {
     virtual ~match_predicate () { }
-    virtual bool operator() (const mftp::file& f) const = 0;
+    virtual bool operator() (const file& f) const = 0;
     virtual match_predicate* clone () const = 0;
   };
   
@@ -66,8 +66,9 @@ namespace mftp {
     timer_state_t m_matching_timer_state;
     ioa::time m_announcement_interval;
     bool m_reported; // True when we have reported a complete download.
-    ioa::handle_manager<ioa::udp_sender_automaton> m_sender;
-    ioa::handle_manager<conversion_channel_automaton> m_converter;
+
+    ioa::handle_manager<mftp_sender_automaton> m_sender;
+    ioa::handle_manager<mftp_receiver_automaton> m_receiver;
 
     const bool m_matching; // Try to find matches for this file.
     std::auto_ptr<match_candidate_predicate> m_match_candidate_predicate;
@@ -93,7 +94,7 @@ namespace mftp {
 				 &m_self, &mftp_automaton::send_complete);
       
       ioa::make_binding_manager (this,
-				 &m_converter, &conversion_channel_automaton::pass_message,
+				 &m_receiver, &mftp_receiver_automaton::receive,
 				 &m_self, &mftp_automaton::receive);
 
       ioa::automaton_manager<ioa::alarm_automaton>* fragment_clock = new ioa::automaton_manager<ioa::alarm_automaton> (this, ioa::make_generator<ioa::alarm_automaton> ());
@@ -153,8 +154,8 @@ namespace mftp {
   public:
     // Not matching.
     mftp_automaton (const file& file,
-		    const ioa::automaton_handle<ioa::udp_sender_automaton>& sender,
-		    const ioa::automaton_handle<conversion_channel_automaton>& converter,
+		    const ioa::automaton_handle<mftp_sender_automaton>& sender,
+		    const ioa::automaton_handle<mftp_receiver_automaton>& converter,
 		    const bool suicide) :
       m_self (ioa::get_aid ()),
       m_file (file),
@@ -170,7 +171,7 @@ namespace mftp {
       m_announcement_interval (INIT_ANNOUNCEMENT_INTERVAL),
       m_reported (m_file.complete ()),
       m_sender (sender),
-      m_converter (converter),
+      m_receiver (converter),
       m_matching (false),
       m_get_matching_files (false),
       m_suicide_flag (suicide)
@@ -180,8 +181,8 @@ namespace mftp {
 
     // Matching.
     mftp_automaton (const file& file,
-		    const ioa::automaton_handle<ioa::udp_sender_automaton>& sender,
-		    const ioa::automaton_handle<conversion_channel_automaton>& converter,
+		    const ioa::automaton_handle<mftp_sender_automaton>& sender,
+		    const ioa::automaton_handle<mftp_receiver_automaton>& converter,
 		    const match_candidate_predicate& match_candidate_pred,
 		    const match_predicate& match_pred,
 		    const bool get_matching_files,
@@ -200,7 +201,7 @@ namespace mftp {
       m_announcement_interval (INIT_ANNOUNCEMENT_INTERVAL),
       m_reported (m_file.complete ()),
       m_sender (sender),
-      m_converter (converter),
+      m_receiver (converter),
       m_matching (true),
       m_match_candidate_predicate (match_candidate_pred.clone ()),
       m_match_predicate (match_pred.clone ()),
@@ -315,7 +316,7 @@ namespace mftp {
 	    else {
 	      // Create an mftp_automaton with MATCHING FALSE to download other file.
 	      // Perform matching when the download is complete.
-	      ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle(), true));
+	      ioa::automaton_manager<mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp_automaton> (this, ioa::make_generator<mftp_automaton> (f, m_sender.get_handle(), m_receiver.get_handle(), true));
 	      
 	      ioa::make_binding_manager (this,
 					 new_file_home, &mftp_automaton::download_complete,
@@ -370,7 +371,7 @@ namespace mftp {
 		    // Create an mftp_automaton with MATCHING FALSE to download other file.
 		    // Perform matching when the download is complete.
 		    file f (m->mat.fid);
-		    ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle(), true));
+		    ioa::automaton_manager<mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp_automaton> (this, ioa::make_generator<mftp_automaton> (f, m_sender.get_handle(), m_receiver.get_handle(), true));
 		    
 		    ioa::make_binding_manager (this,
 		  			       new_file_home, &mftp_automaton::download_complete,
@@ -398,7 +399,7 @@ namespace mftp {
 		    // Create an mftp_automaton with MATCHING FALSE to download other file.
 		    // Perform matching when the download is complete.
 		    file f (m->mat.matches[idx]);
-		    ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle(), true));
+		    ioa::automaton_manager<mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp_automaton> (this, ioa::make_generator<mftp_automaton> (f, m_sender.get_handle(), m_receiver.get_handle(), true));
 		    
 		    ioa::make_binding_manager (this,
 		  			       new_file_home, &mftp_automaton::download_complete,
