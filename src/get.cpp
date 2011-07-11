@@ -1,6 +1,5 @@
 #include "mftp_automaton.hpp"
 #include "jam.hpp"
-#include "conversion_channel_automaton.hpp"
 #include <ioa/global_fifo_scheduler.hpp>
 #include <ioa/ioa.hpp>
 
@@ -18,7 +17,7 @@ namespace jam {
     ioa::handle_manager<mftp_client_automaton> m_self;
     std::set<mftp::fileid> meta_files;
     ioa::automaton_manager<mftp::mftp_sender_automaton>* sender;
-    ioa::automaton_manager<conversion_channel_automaton>* converter;
+    ioa::automaton_manager<mftp::mftp_receiver_automaton>* receiver;
     std::string m_filename;
 
   public:
@@ -26,32 +25,11 @@ namespace jam {
       m_self (ioa::get_aid ()),
       m_filename (fname)
     {
-      // TODO:  Generalize this.
-      const std::string address = "0.0.0.0";
-      const std::string mc_address = "224.0.0.137";
-      const unsigned short port = 54321;
-  
-      ioa::inet_address local_address (address, port);
-      ioa::inet_address multicast_address (mc_address, port);
-    
       sender = new ioa::automaton_manager<mftp::mftp_sender_automaton> (this, ioa::make_generator<mftp::mftp_sender_automaton> ());
- 
-      ioa::automaton_manager<ioa::udp_receiver_automaton>* receiver = new ioa::automaton_manager<ioa::udp_receiver_automaton> (this, ioa::make_generator<ioa::udp_receiver_automaton> (multicast_address, local_address));
-
-      converter = new ioa::automaton_manager<conversion_channel_automaton> (this, ioa::make_generator<conversion_channel_automaton> ());
+      receiver = new ioa::automaton_manager<mftp::mftp_receiver_automaton> (this, ioa::make_generator<mftp::mftp_receiver_automaton> ());
 
       add_observable (sender);
-      add_observable (converter);
-    
-      ioa::make_binding_manager (this,
-				 receiver, &ioa::udp_receiver_automaton::receive,
-				 converter, &conversion_channel_automaton::receive_buffer);
-
-      /*ioa::make_binding_manager (this,
-	converter, &conversion_channel_automaton::pass_message,
-	&m_self, &mftp_client_automaton::receive);
-      */
-    
+      add_observable (receiver);
     }
   private:
     void schedule () const { }
@@ -62,16 +40,16 @@ namespace jam {
       if (o == sender && -1 == sender->get_handle ()) {
 	sender = 0;
       }
-      else if (o == converter && -1 == converter->get_handle()) {
-	converter = 0;
+      else if (o == receiver && -1 == receiver->get_handle()) {
+	receiver = 0;
       }
 
-      if (sender != 0 && converter != 0) {
-	if (sender->get_handle () != -1 && converter->get_handle () != -1) {
+      if (sender != 0 && receiver != 0) {
+	if (sender->get_handle () != -1 && receiver->get_handle () != -1) {
 	  mftp::file f (m_filename.c_str (), m_filename.size (), QUERY_TYPE);
 
 	  // Create the query server.
-	  ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, sender->get_handle (), converter->get_handle (), meta_predicate (), meta_filename_predicate (m_filename), true, false));
+	  ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, sender->get_handle (), receiver->get_handle (), meta_predicate (), meta_filename_predicate (m_filename), true, false));
 	  
 	  ioa::make_binding_manager (this,
 				     query, &mftp::mftp_automaton::match_complete,
@@ -85,7 +63,7 @@ namespace jam {
       memcpy (&fid, f->get_data_ptr (), sizeof (mftp::fileid));
       fid.convert_to_host();
       
-      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), sender->get_handle(), converter->get_handle(), true));  //TODO: CHANGE THIS BACK
+      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), sender->get_handle(), receiver->get_handle(), true));  //TODO: CHANGE THIS BACK
       
       ioa::make_binding_manager (this,
 				 file_home, &mftp::mftp_automaton::download_complete,

@@ -15,9 +15,6 @@
 #include <cstring>
 #include <math.h>
 
-// TODO:  Are we rotating through the matches??
-// TODO:  Timeout for matches.
-
 namespace mftp {
   
   struct match_candidate_predicate {
@@ -243,17 +240,15 @@ namespace mftp {
       return !m_sendq.empty () && m_send_state == SEND_READY;
     }
 
-    ioa::udp_sender_automaton::send_arg send_effect () {
-      // TODO:  This should be generalized.
-      ioa::inet_address a ("224.0.0.137", 54321);
+    ioa::const_shared_ptr<message_buffer> send_effect () {
       ioa::const_shared_ptr<message_buffer> m = m_sendq.front ();
       m_sendq.pop ();
       m_send_state = SEND_COMPLETE_WAIT;
-      return ioa::udp_sender_automaton::send_arg (a, m);
+      return m;
     }
     
   public:
-    V_UP_OUTPUT (mftp_automaton, send, ioa::udp_sender_automaton::send_arg);
+    V_UP_OUTPUT (mftp_automaton, send, ioa::const_shared_ptr<message_buffer>);
 
   private:
     void send_complete_effect () {
