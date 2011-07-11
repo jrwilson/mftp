@@ -25,8 +25,8 @@ namespace jam {
       m_self (ioa::get_aid ()),
       m_filename (fname)
     {
-      sender = new ioa::automaton_manager<mftp::mftp_sender_automaton> (this, ioa::make_generator<mftp::mftp_sender_automaton> ());
-      receiver = new ioa::automaton_manager<mftp::mftp_receiver_automaton> (this, ioa::make_generator<mftp::mftp_receiver_automaton> ());
+      sender = new ioa::automaton_manager<mftp::mftp_sender_automaton> (this, ioa::make_generator<mftp::mftp_sender_automaton> (jam::SEND_ADDR));
+      receiver = new ioa::automaton_manager<mftp::mftp_receiver_automaton> (this, ioa::make_generator<mftp::mftp_receiver_automaton> (jam::LOCAL_ADDR, jam::MULTICAST_ADDR));
 
       add_observable (sender);
       add_observable (receiver);

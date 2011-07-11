@@ -17,14 +17,23 @@ namespace mftp {
     std::queue<ioa::const_shared_ptr<mftp::message> > q;
   
   public:
-    mftp_receiver_automaton () :
+    mftp_receiver_automaton (ioa::inet_address local_address, ioa::inet_address multicast_address) :
       m_self (ioa::get_aid ())
     {
-      // TODO: Generalize this.
-      ioa::inet_address local_address ("0.0.0.0", 54321);
-      ioa::inet_address multicast_address ("224.0.0.137", 54321);
-
       ioa::automaton_manager<ioa::udp_receiver_automaton>* receiver = new ioa::automaton_manager<ioa::udp_receiver_automaton> (this, ioa::make_generator<ioa::udp_receiver_automaton> (multicast_address, local_address));
+
+      ioa::make_binding_manager (this,
+      				 receiver, &ioa::udp_receiver_automaton::receive,
+      				 &m_self, &mftp_receiver_automaton::receive_in);
+
+
+      schedule ();
+    }
+
+    mftp_receiver_automaton (ioa::inet_address local_address) :
+      m_self (ioa::get_aid ())
+    {
+      ioa::automaton_manager<ioa::udp_receiver_automaton>* receiver = new ioa::automaton_manager<ioa::udp_receiver_automaton> (this, ioa::make_generator<ioa::udp_receiver_automaton> (local_address));
 
       ioa::make_binding_manager (this,
       				 receiver, &ioa::udp_receiver_automaton::receive,

@@ -426,18 +426,17 @@ namespace mftp {
 
     void fragment_timer_interrupt_effect () {
       // Purpose is to produce a randomly selected requested fragment.
-      if (m_requests_count != 0 && m_sendq.empty()) {
+      if (m_requests_count != 0 && m_sendq.empty ()) {
 	// Get a random index.
 	uint32_t randy = get_random_request_index ();
 	m_requests[randy] = false;
 	--m_requests_count;
-
+	
 	// Get the fragment for that index.
 	message_buffer* m = get_fragment (randy);
 	m->convert_to_network ();
 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
       }
-
       m_fragment_timer_state = SET_READY;
     }
 
@@ -455,25 +454,27 @@ namespace mftp {
     V_UP_OUTPUT (mftp_automaton, set_request_timer, ioa::time);
 
     void request_timer_interrupt_effect () {
-      if (m_sendq.empty () && !m_file.complete ()) {
-	span_t spans[64];
-	spans[0] = m_file.get_next_range();
-	uint32_t sp_count = 1;
-	bool looking = true;
-	while (looking){
-	  span_t range = m_file.get_next_range ();
-	  if (range.start == spans[0].start || sp_count == 64){ //when we've come back to the range we started on, or we have as many ranges as we can hold
-	    looking = false;
+      if (!m_file.complete ()) {
+	if (m_sendq.empty ()) {
+	  span_t spans[64];
+	  spans[0] = m_file.get_next_range();
+	  uint32_t sp_count = 1;
+	  bool looking = true;
+	  while (looking){
+	    span_t range = m_file.get_next_range ();
+	    if (range.start == spans[0].start || sp_count == 64){ //when we've come back to the range we started on, or we have as many ranges as we can hold
+	      looking = false;
+	    }
+	    else {
+	      spans[sp_count] = range;
+	      ++sp_count;
+	    }
 	  }
-	  else {
-	    spans[sp_count] = range;
-	    ++sp_count;
-	  }
-	}
 
-	message_buffer* m = new message_buffer (request_type (), m_fileid, sp_count, spans);
-	m->convert_to_network ();
-	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+	  message_buffer* m = new message_buffer (request_type (), m_fileid, sp_count, spans);
+	  m->convert_to_network ();
+	  m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+	}
       }
       m_request_timer_state = SET_READY;
     }
@@ -492,15 +493,17 @@ namespace mftp {
     V_UP_OUTPUT (mftp_automaton, set_announcement_timer, ioa::time);
     
     void announcement_timer_interrupt_effect () {
-      if (!m_file.empty () && m_sendq.empty()) {
-	message_buffer* m = get_fragment (m_file.get_random_index ());
-	m->convert_to_network ();
-	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+      if (!m_file.empty ()) {
+	if (m_sendq.empty()) {
+	  message_buffer* m = get_fragment (m_file.get_random_index ());
+	  m->convert_to_network ();
+	  m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+	  if (m_announcement_interval < MAX_ANNOUNCEMENT_INTERVAL) {
+	    m_announcement_interval += m_announcement_interval;
+	  }
+	}
       }
       m_announcement_timer_state = SET_READY;
-      if (m_announcement_interval < MAX_ANNOUNCEMENT_INTERVAL) {
-	m_announcement_interval += m_announcement_interval;
-      }
     }
 
     UV_UP_INPUT (mftp_automaton, announcement_timer_interrupt);
@@ -517,7 +520,6 @@ namespace mftp {
     V_UP_OUTPUT (mftp_automaton, set_match_timer, ioa::time);
 
     void matching_timer_interrupt_effect () {
-
       if (m_matchq.empty ()) {
 	// The match queue is empty.
 	// Resize and add all of the matches to it.

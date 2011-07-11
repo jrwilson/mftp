@@ -17,11 +17,12 @@ namespace mftp {
     std::set<ioa::aid_t> m_outgoing_set;
     ioa::aid_t m_pending_aid;
     std::set<ioa::aid_t> m_outgoing_completes;
-
+    const ioa::inet_address m_send;
   public:
-    mftp_sender_automaton () :
+    mftp_sender_automaton (ioa::inet_address send) :
       m_self (ioa::get_aid ()),
-      m_pending_aid (-1)
+      m_pending_aid (-1),
+      m_send (send)
     {
       ioa::automaton_manager<ioa::udp_sender_automaton>* sender = new ioa::automaton_manager<ioa::udp_sender_automaton> (this, ioa::make_generator<ioa::udp_sender_automaton> ());
 
@@ -67,13 +68,11 @@ namespace mftp {
     }
 
     ioa::udp_sender_automaton::send_arg send_out_effect () {
-      // TODO:  Generalize this.
-      ioa::inet_address a ("224.0.0.137", 54321);
       message_aid m = m_outgoing_messages.front ();
       m_outgoing_messages.pop ();
       m_pending_aid = m.second;
       m_outgoing_set.erase (m_pending_aid);
-      return ioa::udp_sender_automaton::send_arg (a, m.first);
+      return ioa::udp_sender_automaton::send_arg (m_send, m.first);
     }
 
     V_UP_OUTPUT (mftp_sender_automaton, send_out, ioa::udp_sender_automaton::send_arg);
