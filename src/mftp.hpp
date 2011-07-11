@@ -24,25 +24,30 @@ namespace mftp {
 
   struct fileid
   {
-    uint8_t hash[HASH_SIZE];
     uint32_t type;
     uint32_t length;
-  
+    uint8_t hash[HASH_SIZE];
+
     bool operator== (const fileid& other) const {
-      return memcmp (hash, other.hash, HASH_SIZE) == 0 &&
-	type == other.type &&
-	length == other.length;
+      return type == other.type &&
+	length == other.length &&
+	memcmp (hash, other.hash, HASH_SIZE) == 0;
+    }
+
+    bool operator!= (const fileid& other) const {
+      return type != other.type &&
+	length != other.length &&
+	memcmp (hash, other.hash, HASH_SIZE) != 0;
     }
 
     bool operator< (const fileid& other) const {
-      int temp = memcmp (hash, other.hash, HASH_SIZE);
-      if (temp != 0) {
-	return temp < 0;
-      }
       if (type != other.type) {
 	return type < other.type;
       }
-      return length < other.length;
+      if (length != other.length) {
+	return length < other.length;
+      }
+      return memcmp (hash, other.hash, HASH_SIZE) < 0;
     }
 
     void convert_to_network () {

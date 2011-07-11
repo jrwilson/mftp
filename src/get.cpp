@@ -71,7 +71,7 @@ namespace jam {
 	  mftp::file f (m_filename.c_str (), m_filename.size (), QUERY_TYPE);
 
 	  // Create the query server.
-	  ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, sender->get_handle (), converter->get_handle (), meta_predicate (), meta_filename_predicate (m_filename)));
+	  ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, sender->get_handle (), converter->get_handle (), meta_predicate (), meta_filename_predicate (m_filename), true));
 	  
 	  ioa::make_binding_manager (this,
 				     query, &mftp::mftp_automaton::match_complete,
@@ -124,64 +124,3 @@ int main (int argc, char* argv[]) {
   ioa::run (sched, ioa::make_generator<jam::mftp_client_automaton> (fname));
   return 0;
 }
-
-
-
-  /* void receive_effect (const ioa::const_shared_ptr<mftp::message>& m){
-
-    if (m->header.message_type == mftp::FRAGMENT) {
-      if (m->frag.fid.type == META_TYPE && meta_files.count (m->frag.fid) == 0) {
-	mftp::file f (m->frag.fid);
-	f.write_chunk (m->frag.offset, m->frag.data);
-	if(f.complete ()) {
-	  process_meta_file (f);
-	}
-	else {
-	  if (meta_files.count (m->frag.fid) == 0) {
-	    meta_files.insert (m->frag.fid);
-	    
-	    ioa::automaton_manager<mftp::mftp_automaton>* meta_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (m->frag.fid)));
-	    
-	    ioa::make_binding_manager (this,
-				       meta_file_home, &mftp::mftp_automaton::send,
-				       sender, &ioa::udp_sender_automaton::send);
-	    
-	    ioa::make_binding_manager (this,
-				       sender, &ioa::udp_sender_automaton::send_complete,
-				       meta_file_home, &mftp::mftp_automaton::send_complete);
-	    
-	    ioa::make_binding_manager (this,
-				       converter, &conversion_channel_automaton::pass_message,
-				       meta_file_home, &mftp::mftp_automaton::receive);		
-	    
-	    ioa::make_binding_manager (this,
-				       meta_file_home, &mftp::mftp_automaton::download_complete,
-				       &m_self, &mftp_client_automaton::meta_complete);
-	  }
-	}
-	meta_files.insert(m->frag.fid);
-      }
-    }  
-    }
-  
-public:
-    V_UP_INPUT (mftp_client_automaton, receive, ioa::const_shared_ptr<mftp::message>);
-  */  
-
-  /*void process_meta_file (const ioa::const_shared_ptr<mftp::file>& f) {
-    if (f->get_mfileid ().get_original_length () > sizeof (mftp::fileid)) {
-      std::string s (reinterpret_cast<const char*> (f->get_data_ptr ()) + sizeof (mftp::fileid), f->get_mfileid ().get_original_length () - sizeof (mftp::fileid));
-      
-      if (s == m_filename){
-	mftp::fileid fid;
-	memcpy (&fid, f->get_data_ptr (), sizeof (mftp::fileid));
-	fid.convert_to_host();
-	
-	ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid),false,false,sender->get_handle(), converter->get_handle()));
-	
-	ioa::make_binding_manager (this,
-				   file_home, &mftp::mftp_automaton::download_complete,
-				   &m_self, &mftp_client_automaton::file_complete);
-      }	
-    }  
-    }*/

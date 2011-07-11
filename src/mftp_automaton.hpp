@@ -7,7 +7,6 @@
 #include <ioa/udp_sender_automaton.hpp>
 #include <ioa/udp_receiver_automaton.hpp>
 
-#include <arpa/inet.h>
 #include <config.hpp>
 #include <cstdlib>
 #include <queue>
@@ -71,10 +70,12 @@ namespace mftp {
     const bool m_matching; // Try to find matches for this file.
     std::auto_ptr<match_candidate_predicate> m_match_candidate_predicate;
     std::auto_ptr<match_predicate> m_match_predicate;
+    const bool m_get_matching_files; // Always get matching files.
 
     std::set<fileid> m_pending_matches;
     std::set<fileid> m_matches;
     std::set<fileid> m_non_matches;
+    std::deque<fileid> m_matchq;
 
     std::queue<ioa::const_shared_ptr<file> > m_matching_files;
 
@@ -164,7 +165,8 @@ namespace mftp {
       m_reported (m_file.complete ()),
       m_sender (sender),
       m_converter (converter),
-      m_matching (false)
+      m_matching (false),
+      m_get_matching_files (false)
     {
       create_bindings ();
     }
@@ -174,7 +176,8 @@ namespace mftp {
 		    const ioa::automaton_handle<ioa::udp_sender_automaton>& sender,
 		    const ioa::automaton_handle<conversion_channel_automaton>& converter,
 		    const match_candidate_predicate& match_candidate_pred,
-		    const match_predicate& match_pred) :
+		    const match_predicate& match_pred,
+		    const bool get_matching_files) :
       m_self (ioa::get_aid ()),
       m_file (file),
       m_mfileid (file.get_mfileid ()),
@@ -191,7 +194,8 @@ namespace mftp {
       m_converter (converter),
       m_matching (true),
       m_match_candidate_predicate (match_candidate_pred.clone ()),
-      m_match_predicate (match_pred.clone ())
+      m_match_predicate (match_pred.clone ()),
+      m_get_matching_files (get_matching_files)
     {
       create_bindings ();
     }
@@ -297,7 +301,7 @@ namespace mftp {
 	    }
 	    else {
 	      // Create an mftp_automaton with MATCHING FALSE to download other file.
-	      // Perform matching the download is complete.
+	      // Perform matching when the download is complete.
 	      ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle()));
 	      
 	      ioa::make_binding_manager (this,
@@ -336,8 +340,65 @@ namespace mftp {
 
       case MATCH:
 	{
-	  //TODO:  learning matches from others.
-	  std::cout << "MATCH" << std::endl;
+	  if (m_matching) {
+	    if (m->mat.fid != m_fileid) {
+	      // Search for our fileid in the set of matches.
+	      for (uint32_t idx = 0; idx < m->mat.match_count; ++idx) {
+		if (m->mat.matches[idx] == m_fileid &&
+		    m_pending_matches.count (m->mat.fid) == 0 &&
+		    m_matches.count (m->mat.fid) == 0 &&
+		    m_non_matches.count (m->mat.fid) == 0 &&
+		    (*m_match_candidate_predicate) (m->mat.fid)) {
+		  // We have never seen this before.
+		  if (m_get_matching_files) {
+		    // We need to get the file.
+		    m_pending_matches.insert (m->mat.fid);
+
+		    // Create an mftp_automaton with MATCHING FALSE to download other file.
+		    // Perform matching when the download is complete.
+		    file f (m->mat.fid);
+		    ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle()));
+		    
+		    ioa::make_binding_manager (this,
+		  			       new_file_home, &mftp_automaton::download_complete,
+		  			       &m_self, &mftp_automaton::match_download_complete);
+		  }
+		  else {
+		    // We can just add it to the set.
+		    m_matches.insert (m->mat.fid);
+		  }
+		}
+	      }
+	    }
+	    else {
+	      // Add all matches in the set.
+	      for (uint32_t idx = 0; idx < m->mat.match_count; ++idx) {
+		if (m_pending_matches.count (m->mat.matches[idx]) == 0 &&
+		    m_matches.count (m->mat.matches[idx]) == 0 &&
+		    m_non_matches.count (m->mat.matches[idx]) == 0 &&
+		    (*m_match_candidate_predicate) (m->mat.matches[idx])) {
+		  // We have never seen this before.
+		  if (m_get_matching_files) {
+		    // We need to get the file.
+		    m_pending_matches.insert (m->mat.matches[idx]);
+
+		    // Create an mftp_automaton with MATCHING FALSE to download other file.
+		    // Perform matching when the download is complete.
+		    file f (m->mat.matches[idx]);
+		    ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle()));
+		    
+		    ioa::make_binding_manager (this,
+		  			       new_file_home, &mftp_automaton::download_complete,
+		  			       &m_self, &mftp_automaton::match_download_complete);
+		  }
+		  else {
+		    // We can just add it to the set.
+		    m_matches.insert (m->mat.matches[idx]);
+		  }
+		}
+	      }
+	    }
+	  }
 	}
 	break;
 
@@ -454,44 +515,27 @@ namespace mftp {
     V_UP_OUTPUT (mftp_automaton, set_match_timer, ioa::time);
 
     void matching_timer_interrupt_effect () {
-      std::cout << __func__ << std::endl;
 
-      // if (!m_matches.empty () && m_sendq.empty()){
-      // 	size_t count = m_matches.size();
-      // 	fileid mats[12];
-      // 	if (count > 12){
-      // 	  count = 12;
-      // 	  srand ((unsigned) time (0));
-      // 	  uint32_t idx = rand () % m_matches.size();
-	  
-      // 	  std::set<fileid>::iterator it = m_matches.begin ();
-      // 	  for (uint32_t i = 0; i < idx; i++) { ++it; }
+      if (m_matchq.empty ()) {
+	// The match queue is empty.
+	// Resize and add all of the matches to it.
+	m_matchq.resize (m_matches.size ());
+	std::copy (m_matches.begin (), m_matches.end (), m_matchq.begin ());
+      }
 
-      // 	  for (uint32_t j = 0; j < count; ++j) {
-      // 	    if (it == m_matches.end ()) {
-      // 	      mats[j] = *it;
-      // 	      it = m_matches.begin ();
-      // 	    } 
-      // 	    else {
-      // 	      mats[j] = *it;
-      // 	      ++it;
-      // 	    }
-      // 	  }
-      // 	}
-      // 	else {
-      // 	  uint32_t i = 0;
-      // 	  for (std::set<fileid>::iterator it = m_matches.begin ();
-      // 	       it != m_matches.end (); 
-      // 	       ++it) {
-      // 	    mats[i] = *it;
-      // 	    ++i;
-      // 	  }
-      // 	}
-      // 	message_buffer* m = new message_buffer (match_type (), m_fileid, static_cast<uint32_t>(count), mats);
+      uint32_t count = 0;
+      fileid matches[MATCHES_SIZE];
+      while (count < MATCHES_SIZE && !m_matchq.empty ()) {
+	matches[count] = m_matchq.front ();
+	m_matchq.pop_front ();
+	++count;
+      }
 
-      // 	m->convert_to_network ();
-      // 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
-      // }
+      if (count > 0) {
+	message_buffer* m = new message_buffer (match_type (), m_fileid, count, matches);
+ 	m->convert_to_network ();
+	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+      }
 
       m_matching_timer_state = SET_READY;
     }
@@ -563,8 +607,8 @@ namespace mftp {
 
   const ioa::time mftp_automaton::FRAGMENT_INTERVAL (0, 1000); // 1000 microseconds = 1 millisecond
   const ioa::time mftp_automaton::REQUEST_INTERVAL (1, 0); // 1 second
-  const ioa::time mftp_automaton::ANNOUNCEMENT_INTERVAL (7, 0); // 7 seconds
-  const ioa::time mftp_automaton::MATCHING_INTERVAL (5, 0); //5 seconds
+  const ioa::time mftp_automaton::ANNOUNCEMENT_INTERVAL (8, 0); // 8 seconds
+  const ioa::time mftp_automaton::MATCHING_INTERVAL (4, 0); //4 seconds
 
 }
 
