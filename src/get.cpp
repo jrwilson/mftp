@@ -17,7 +17,7 @@ namespace jam {
   private:
     ioa::handle_manager<mftp_client_automaton> m_self;
     std::set<mftp::fileid> meta_files;
-    ioa::automaton_manager<ioa::udp_sender_automaton>* sender;
+    ioa::automaton_manager<mftp::mftp_sender_automaton>* sender;
     ioa::automaton_manager<conversion_channel_automaton>* converter;
     std::string m_filename;
 
@@ -34,7 +34,7 @@ namespace jam {
       ioa::inet_address local_address (address, port);
       ioa::inet_address multicast_address (mc_address, port);
     
-      sender = new ioa::automaton_manager<ioa::udp_sender_automaton> (this, ioa::make_generator<ioa::udp_sender_automaton> ());
+      sender = new ioa::automaton_manager<mftp::mftp_sender_automaton> (this, ioa::make_generator<mftp::mftp_sender_automaton> ());
  
       ioa::automaton_manager<ioa::udp_receiver_automaton>* receiver = new ioa::automaton_manager<ioa::udp_receiver_automaton> (this, ioa::make_generator<ioa::udp_receiver_automaton> (multicast_address, local_address));
 

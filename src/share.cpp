@@ -1,6 +1,5 @@
 #include "mftp_automaton.hpp"
 #include "jam.hpp"
-#include <ioa/udp_sender_automaton.hpp>
 #include <ioa/udp_receiver_automaton.hpp>
 #include <ioa/global_fifo_scheduler.hpp>
 #include <ioa/ioa.hpp>
@@ -16,7 +15,7 @@ namespace jam {
     private ioa::observer
   {
   private:
-    ioa::automaton_manager<ioa::udp_sender_automaton>* sender;
+    ioa::automaton_manager<mftp::mftp_sender_automaton>* sender;
     ioa::automaton_manager<conversion_channel_automaton>* converter;
     
     const std::string m_filename;
@@ -40,7 +39,7 @@ namespace jam {
       ioa::inet_address local_address (address, port);
       ioa::inet_address multicast_address (mc_address, port);
 
-      sender = new ioa::automaton_manager<ioa::udp_sender_automaton> (this, ioa::make_generator<ioa::udp_sender_automaton> ());
+      sender = new ioa::automaton_manager<mftp::mftp_sender_automaton> (this, ioa::make_generator<mftp::mftp_sender_automaton> ());
 
       ioa::automaton_manager<ioa::udp_receiver_automaton>* receiver = new ioa::automaton_manager<ioa::udp_receiver_automaton> (this, ioa::make_generator<ioa::udp_receiver_automaton> (multicast_address, local_address));
 
