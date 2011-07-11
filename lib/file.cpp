@@ -1,5 +1,5 @@
-#include "file.hpp"
-#include "sha2_256.hpp"
+#include <mftp/file.hpp>
+#include <mftp/sha2_256.hpp>
 
 #include <math.h>
 #include <cstdlib>

@@ -1,7 +1,7 @@
 #ifndef __mftp_receiver_automaton_hpp__
 #define __mftp_receiver_automaton_hpp__
 
-#include "mftp.hpp"
+#include <mftp/mftp.hpp>
 #include <ioa/ioa.hpp>
 #include <ioa/udp_receiver_automaton.hpp>
 

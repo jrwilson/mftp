@@ -1,10 +1,10 @@
 #ifndef __mftp_automaton_hpp__
 #define	__mftp_automaton_hpp__
 
-#include "file.hpp"
+#include <mftp/file.hpp>
 
-#include "mftp_sender_automaton.hpp"
-#include "mftp_receiver_automaton.hpp"
+#include <mftp/mftp_sender_automaton.hpp>
+#include <mftp/mftp_receiver_automaton.hpp>
 #include <ioa/alarm_automaton.hpp>
 
 #include <config.hpp>

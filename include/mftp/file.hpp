@@ -1,7 +1,7 @@
 #ifndef __file_hpp__
 #define __file_hpp__
 
-#include "mftp.hpp"
+#include <mftp/mftp.hpp>
 
 #include <vector>
 

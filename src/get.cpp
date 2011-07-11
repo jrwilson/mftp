@@ -1,4 +1,3 @@
-#include "mftp_automaton.hpp"
 #include "jam.hpp"
 #include <ioa/global_fifo_scheduler.hpp>
 #include <ioa/ioa.hpp>
