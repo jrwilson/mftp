@@ -15,6 +15,8 @@
 #include <cstring>
 #include <math.h>
 
+// TODO:  We accumulate matches without ever forgetting them.  We should purge matches that we haven't seen in a while.
+
 namespace mftp {
   
   struct match_candidate_predicate {
