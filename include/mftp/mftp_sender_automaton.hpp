@@ -8,22 +8,39 @@
 namespace mftp {
 
   class mftp_sender_automaton :
-    public ioa::automaton
+    public ioa::automaton,
+    private ioa::observer
   {
   private:
     ioa::handle_manager<mftp_sender_automaton> m_self;
     typedef std::pair<ioa::const_shared_ptr<message_buffer>, ioa::aid_t> message_aid;
-    std::queue<message_aid > m_outgoing_messages;
+    std::list<message_aid > m_outgoing_messages;
     std::set<ioa::aid_t> m_outgoing_set;
     ioa::aid_t m_pending_aid;
     std::set<ioa::aid_t> m_outgoing_completes;
     const ioa::inet_address m_send;
+
+    struct message_aid_equal {
+      const ioa::aid_t m_aid;
+      
+      message_aid_equal (const ioa::aid_t aid) :
+	m_aid (aid)
+      { }
+      
+      bool operator() (const message_aid& o) const {
+	return m_aid == o.second;
+      }
+    };
+
   public:
-    mftp_sender_automaton (ioa::inet_address send) :
+    mftp_sender_automaton (ioa::inet_address send_address) :
       m_self (ioa::get_aid ()),
       m_pending_aid (-1),
-      m_send (send)
+      m_send (send_address)
     {
+      add_observable (&send);
+      add_observable (&send_complete);
+
       ioa::automaton_manager<ioa::udp_sender_automaton>* sender = new ioa::automaton_manager<ioa::udp_sender_automaton> (this, ioa::make_generator<ioa::udp_sender_automaton> ());
 
       ioa::make_binding_manager (this,
@@ -49,12 +66,38 @@ namespace mftp {
       }
     }
 
+    void observe (ioa::observable* o) {
+      if (o == &send && send.recent_op == ioa::UNBOUND) {
+	purge (send.recent_parameter);
+      }
+      else if (o == &send_complete && send_complete.recent_op == ioa::UNBOUND) {
+	purge (send_complete.recent_parameter);
+      }
+    }
+
+    void purge (const ioa::aid_t aid) {
+      if (m_outgoing_set.count (aid) != 0) {
+	std::list<message_aid>::iterator pos = std::find_if (m_outgoing_messages.begin (),
+							     m_outgoing_messages.end (),
+							     message_aid_equal (aid));
+	assert (pos != m_outgoing_messages.end ());
+	m_outgoing_messages.erase (pos);
+	m_outgoing_set.erase (aid);
+      }
+
+      if (m_pending_aid == aid) {
+	m_pending_aid = -1;
+      }
+      
+      m_outgoing_completes.erase (aid);
+    }
+
     void send_effect (const ioa::const_shared_ptr<message_buffer>& message,
 		      ioa::aid_t aid) {
       if (m_outgoing_set.count (aid) == 0 &&
 	  m_pending_aid != aid &&
 	  m_outgoing_completes.count (aid) == 0) {
-	m_outgoing_messages.push (std::make_pair (message, aid));
+	m_outgoing_messages.push_back (std::make_pair (message, aid));
 	m_outgoing_set.insert (aid);
       }
     }
@@ -69,7 +112,7 @@ namespace mftp {
 
     ioa::udp_sender_automaton::send_arg send_out_effect () {
       message_aid m = m_outgoing_messages.front ();
-      m_outgoing_messages.pop ();
+      m_outgoing_messages.pop_front ();
       m_pending_aid = m.second;
       m_outgoing_set.erase (m_pending_aid);
       return ioa::udp_sender_automaton::send_arg (m_send, m.first);
