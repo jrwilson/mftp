@@ -87,10 +87,10 @@ namespace mftp {
     void create_bindings () {
       ioa::make_binding_manager (this,
 				 &m_self, &mftp_automaton::send,
-				 &m_sender, &ioa::udp_sender_automaton::send);
+				 &m_sender, &mftp_sender_automaton::send);
       
       ioa::make_binding_manager (this,
-				 &m_sender, &ioa::udp_sender_automaton::send_complete,
+				 &m_sender, &mftp_sender_automaton::send_complete,
 				 &m_self, &mftp_automaton::send_complete);
       
       ioa::make_binding_manager (this,
@@ -155,7 +155,7 @@ namespace mftp {
     // Not matching.
     mftp_automaton (const file& file,
 		    const ioa::automaton_handle<mftp_sender_automaton>& sender,
-		    const ioa::automaton_handle<mftp_receiver_automaton>& converter,
+		    const ioa::automaton_handle<mftp_receiver_automaton>& receiver,
 		    const bool suicide) :
       m_self (ioa::get_aid ()),
       m_file (file),
@@ -171,7 +171,7 @@ namespace mftp {
       m_announcement_interval (INIT_ANNOUNCEMENT_INTERVAL),
       m_reported (m_file.complete ()),
       m_sender (sender),
-      m_receiver (converter),
+      m_receiver (receiver),
       m_matching (false),
       m_get_matching_files (false),
       m_suicide_flag (suicide)
@@ -182,7 +182,7 @@ namespace mftp {
     // Matching.
     mftp_automaton (const file& file,
 		    const ioa::automaton_handle<mftp_sender_automaton>& sender,
-		    const ioa::automaton_handle<mftp_receiver_automaton>& converter,
+		    const ioa::automaton_handle<mftp_receiver_automaton>& receiver,
 		    const match_candidate_predicate& match_candidate_pred,
 		    const match_predicate& match_pred,
 		    const bool get_matching_files,
@@ -201,7 +201,7 @@ namespace mftp {
       m_announcement_interval (INIT_ANNOUNCEMENT_INTERVAL),
       m_reported (m_file.complete ()),
       m_sender (sender),
-      m_receiver (converter),
+      m_receiver (receiver),
       m_matching (true),
       m_match_candidate_predicate (match_candidate_pred.clone ()),
       m_match_predicate (match_pred.clone ()),
@@ -256,24 +256,12 @@ namespace mftp {
     V_UP_OUTPUT (mftp_automaton, send, ioa::udp_sender_automaton::send_arg);
 
   private:
-    void send_complete_effect (const int& result) {
-      if (result != 0) {
-	char buf[256];
-#ifdef STRERROR_R_CHAR_P
-	std::cerr << "Couldn't send udp_sender_automaton: " << strerror_r (result, buf, 256) << std::endl;
-#else
-	strerror_r (result, buf, 256);
-	std::cerr << "Couldn't send udp_sender_automaton: " << buf << std::endl;
-#endif
-	exit(EXIT_FAILURE);
-      }
-      else {
-	m_send_state = SEND_READY;
-      }
+    void send_complete_effect () {
+      m_send_state = SEND_READY;
     }
 
   public:
-    V_UP_INPUT (mftp_automaton, send_complete, int);
+    UV_UP_INPUT (mftp_automaton, send_complete);
 
   private:
     void receive_effect (const ioa::const_shared_ptr<message>& m) {
@@ -514,7 +502,7 @@ namespace mftp {
       }
       m_announcement_timer_state = SET_READY;
       if (m_announcement_interval < MAX_ANNOUNCEMENT_INTERVAL) {
-	m_announcement_interval = m_announcement_interval * 2;
+	m_announcement_interval += m_announcement_interval;
       }
     }
 
