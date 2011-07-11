@@ -72,7 +72,7 @@ namespace mftp {
     std::auto_ptr<match_predicate> m_match_predicate;
     const bool m_get_matching_files; // Always get matching files.
 
-    const bool m_suicide_flag;  //Self-destruct when job is done.
+    bool m_suicide_flag;  //Self-destruct when job is done.
 
     std::set<fileid> m_pending_matches;
     std::set<fileid> m_matches;
@@ -228,6 +228,9 @@ namespace mftp {
       }
       if (download_complete_precondition ()) {
 	ioa::schedule (&mftp_automaton::download_complete);
+      }
+      if (suicide_precondition ()) {
+	ioa::schedule (&mftp_automaton::suicide);
       }
     }
 
@@ -562,10 +565,14 @@ namespace mftp {
 
   private: 
     bool suicide_precondition () const {
+      //bool b = m_reported && m_suicide_flag;
+      //std::cout << __func__ << ": " << b << std::endl;
       return m_reported && m_suicide_flag;
     }
 
     void suicide_effect () {
+      std::cout << "committing suicide" << std::endl;
+      m_suicide_flag = false;
       self_destruct ();
     }
 

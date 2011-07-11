@@ -85,7 +85,7 @@ namespace jam {
       memcpy (&fid, f->get_data_ptr (), sizeof (mftp::fileid));
       fid.convert_to_host();
       
-      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), sender->get_handle(), converter->get_handle(), false));
+      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), sender->get_handle(), converter->get_handle(), true));  //TODO: CHANGE THIS BACK
       
       ioa::make_binding_manager (this,
 				 file_home, &mftp::mftp_automaton::download_complete,
