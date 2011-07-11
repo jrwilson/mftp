@@ -72,6 +72,8 @@ namespace mftp {
     std::auto_ptr<match_predicate> m_match_predicate;
     const bool m_get_matching_files; // Always get matching files.
 
+    const bool m_suicide_flag;  //Self-destruct when job is done.
+
     std::set<fileid> m_pending_matches;
     std::set<fileid> m_matches;
     std::set<fileid> m_non_matches;
@@ -150,7 +152,8 @@ namespace mftp {
     // Not matching.
     mftp_automaton (const file& file,
 		    const ioa::automaton_handle<ioa::udp_sender_automaton>& sender,
-		    const ioa::automaton_handle<conversion_channel_automaton>& converter) :
+		    const ioa::automaton_handle<conversion_channel_automaton>& converter,
+		    const bool suicide) :
       m_self (ioa::get_aid ()),
       m_file (file),
       m_mfileid (file.get_mfileid ()),
@@ -166,7 +169,8 @@ namespace mftp {
       m_sender (sender),
       m_converter (converter),
       m_matching (false),
-      m_get_matching_files (false)
+      m_get_matching_files (false),
+      m_suicide_flag (suicide)
     {
       create_bindings ();
     }
@@ -177,7 +181,8 @@ namespace mftp {
 		    const ioa::automaton_handle<conversion_channel_automaton>& converter,
 		    const match_candidate_predicate& match_candidate_pred,
 		    const match_predicate& match_pred,
-		    const bool get_matching_files) :
+		    const bool get_matching_files,
+		    const bool suicide) :
       m_self (ioa::get_aid ()),
       m_file (file),
       m_mfileid (file.get_mfileid ()),
@@ -195,7 +200,8 @@ namespace mftp {
       m_matching (true),
       m_match_candidate_predicate (match_candidate_pred.clone ()),
       m_match_predicate (match_pred.clone ()),
-      m_get_matching_files (get_matching_files)
+      m_get_matching_files (get_matching_files),
+      m_suicide_flag (suicide)
     {
       create_bindings ();
     }
@@ -302,7 +308,7 @@ namespace mftp {
 	    else {
 	      // Create an mftp_automaton with MATCHING FALSE to download other file.
 	      // Perform matching when the download is complete.
-	      ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle()));
+	      ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle(), true));
 	      
 	      ioa::make_binding_manager (this,
 					 new_file_home, &mftp_automaton::download_complete,
@@ -357,7 +363,7 @@ namespace mftp {
 		    // Create an mftp_automaton with MATCHING FALSE to download other file.
 		    // Perform matching when the download is complete.
 		    file f (m->mat.fid);
-		    ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle()));
+		    ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle(), true));
 		    
 		    ioa::make_binding_manager (this,
 		  			       new_file_home, &mftp_automaton::download_complete,
@@ -385,7 +391,7 @@ namespace mftp {
 		    // Create an mftp_automaton with MATCHING FALSE to download other file.
 		    // Perform matching when the download is complete.
 		    file f (m->mat.matches[idx]);
-		    ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle()));
+		    ioa::automaton_manager<mftp::mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, m_sender.get_handle(), m_converter.get_handle(), true));
 		    
 		    ioa::make_binding_manager (this,
 		  			       new_file_home, &mftp_automaton::download_complete,
@@ -553,6 +559,18 @@ namespace mftp {
 
   public:
     V_UP_OUTPUT (mftp_automaton, download_complete, file);
+
+  private: 
+    bool suicide_precondition () const {
+      return m_reported && m_suicide_flag;
+    }
+
+    void suicide_effect () {
+      self_destruct ();
+    }
+
+  public:
+    UP_INTERNAL (mftp_automaton, suicide);
 
   private:
     void match_download_complete_effect (const file& f,

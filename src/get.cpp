@@ -71,7 +71,7 @@ namespace jam {
 	  mftp::file f (m_filename.c_str (), m_filename.size (), QUERY_TYPE);
 
 	  // Create the query server.
-	  ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, sender->get_handle (), converter->get_handle (), meta_predicate (), meta_filename_predicate (m_filename), true));
+	  ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, sender->get_handle (), converter->get_handle (), meta_predicate (), meta_filename_predicate (m_filename), true, false));
 	  
 	  ioa::make_binding_manager (this,
 				     query, &mftp::mftp_automaton::match_complete,
@@ -85,7 +85,7 @@ namespace jam {
       memcpy (&fid, f->get_data_ptr (), sizeof (mftp::fileid));
       fid.convert_to_host();
       
-      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), sender->get_handle(), converter->get_handle()));
+      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), sender->get_handle(), converter->get_handle(), false));
       
       ioa::make_binding_manager (this,
 				 file_home, &mftp::mftp_automaton::download_complete,
