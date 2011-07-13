@@ -122,24 +122,26 @@ Moving data across a network can take a variety of forms. These forms correspond
 \paragraph {Components.}
 The protocol employs a number of conceptually simple structures--a reflection of its overall simplicity, both in design and in purpose.
 One of these structures is called a File. 
-Files are a sequence of bytes with a length and a user-defined type; they are broken down into equally sized pieces called fragments.  
-Each File has a respective File ID, which is a structure that contains a hash of the file content, length, and type. 
+Files are a sequence of bytes with a length and a user-defined type; they are broken down into equally sized pieces called \emph{fragments}.  
+Each File has a File ID, which is a structure that contains a hash of the File content, the File's length, and the File's type. 
 Each File ID is unique to its File.
-From these different File and File IDs a matching concept is established: given a File $f_1$ and $f_2$, one can define a matching predicate $\mu$.
-Finally, there are three types of Files which are conceptually important to the protocol, the first of which being a request.
-A request contains a File ID and a set of contiguous regions.  In our implementation, the set of contiguous regions was a set of fragment indices, but one can envision the request to contain anything that defines a set.
+From Files and File IDs a matching concept is established: given two Files $f_1$ and $f_2$, one can define a matching predicate $\mu$.
+Finally, there are three types of Files which are conceptually important to the protocol, the first of which being a \emph{request}.
+A \emph{request} contains a File ID and a set of contiguous regions of the File.  In our implementation, the set of contiguous regions was a set of fragment indices, but one can envision the request to contain anything that defines a set.
 %%A request contains a File ID and a set of fragment indices. 
 %%We implemented requests as the File ID and a set of contiguous regions.  
 %%However, one can envision the request to contain anything that defines a set.
-The second type is a fragment, which consists of a File ID, fragment index, and the data itself.
-Last of all is a match, which consists of a File ID and a set of matching File IDs.
+The second type is a \emph{fragment}, which consists of a File ID, a fragment index, and the data comprising that fragment of the file.
+Last is a \emph{match}, which consists of a File ID and a set of matching File IDs.
 \paragraph {Component Interactions.}
-In a simple scenario, if one gets a request for a File one has fragments for, one can send those fragments out.
-Fragments are periodically broadcasted to indicate what Files exist in the network.
-A client can use requests to pull for File fragments, which can span from individual fragments to the whole file.
-Two different matching steps are established.
-The first uses $\mu_0$ to take two File ID's and determine whether there could be a match between the two Files.  
-If this is true, the second uses $\mu_1$ to take two Files and determine whether or not there is a match.
+In a simple scenario, if a server gets a request for a File it has fragments for, it can send those fragments out.
+Fragments are periodically broadcast even in the absence of requests to indicate what Files exist in the network.
+A client can use requests to pull for regions of a File which can span from individual fragments to the whole file.
+A client which has successfully downloaded any number of fragments of a File can then serve those fragments.
+%%Two different matching steps are established.
+Matching is a two-step process.
+The first step applies $\mu_0$ to two File IDs to determine whether a match is possible between the two Files.  
+The second step applies $\mu_1$ to the two Files to determine whether there is a match.
 If $\mu_1$($f_1$,$f_2$) is true, $\mu_0$($fid_1$,$fid_2$) must be true.
 However, if $\mu_0$($fid_1$,$fid_2$) is true, $\mu_1$($f_1$,$f_2$) does \emph{not} have to be true. 
 
