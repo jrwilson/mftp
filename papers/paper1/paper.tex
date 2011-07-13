@@ -117,29 +117,44 @@ Section~\ref{related_work} contains an overview of related work and we offer our
 
 \section{Model\label{model}}
 
+% jrw:  Move this to the introduction.
 Moving data across a network can take a variety of forms. These forms correspond to different user needs and consequently different protocols. Multicast File Transfer Protocol (MFTP) addresses the need to move immutable data between many different nodes in a fully distributed network. 
 %% This is useful for 1) device discovery 2) File transfer in the absence of many technologies (including internet). the only thing that is necessary is computers with routing and broadcast/multicast enabled 3) maximizing the reach of a gossip style network
-\paragraph {Components.}
+
+\paragraph {Files.}
+% jrw:  This rhetoric is unnecessary, i.e., there is no need to claim that you are simpler unless you are comparing yourself to someone else.
+% jrw:  I would start with ``The main concept in MFTP is that of a file. ...''
 The protocol employs a number of conceptually simple structures--a reflection of its overall simplicity, both in design and in purpose.
-One of these structures is called a File. 
+% jrw:  Lowercase File here and following.  Emphasize first time.
+One of these structures is called a File.
+% jrw:  Fragments should be a separate sentence.  Since you doing definitions, some of the sentences will be short and choppy.  This is okay.
 Files are a sequence of bytes with a length and a user-defined type; they are broken down into equally sized pieces called \emph{fragments}.  
 Each File has a File ID, which is a structure that contains a hash of the File content, the File's length, and the File's type. 
+% jrw:  Maybe ``Each file is uniquely identified by its fileid.''
 Each File ID is unique to its File.
+
+\paragraph{Matching.}
+% jrw:  This is awkward.  Maybe ``Given two file f1 and f2, one can define a matching predicate mu.''
 From Files and File IDs a matching concept is established: given two Files $f_1$ and $f_2$, one can define a matching predicate $\mu$.
+% jrw:  These are messages not files.  Define the purpose of the message before describing its contents.
 Finally, there are three types of Files which are conceptually important to the protocol, the first of which being a \emph{request}.
+% jrw:  Backwards.  A request contains a set of fragment indices.  (Might need to define fragment index.)  Our implementation has requests that contain a set of spans.
 A \emph{request} contains a File ID and a set of contiguous regions of the File.  In our implementation, the set of contiguous regions was a set of fragment indices, but one can envision the request to contain anything that defines a set.
 %%A request contains a File ID and a set of fragment indices. 
 %%We implemented requests as the File ID and a set of contiguous regions.  
 %%However, one can envision the request to contain anything that defines a set.
 The second type is a \emph{fragment}, which consists of a File ID, a fragment index, and the data comprising that fragment of the file.
 Last is a \emph{match}, which consists of a File ID and a set of matching File IDs.
-\paragraph {Component Interactions.}
+
+\paragraph {Tasks.}
+% jrw:  MFTP is a peer-to-peer (?) or peer-based (?) protocol since everyone can be both a client and a server.
 In a simple scenario, if a server gets a request for a File it has fragments for, it can send those fragments out.
 Fragments are periodically broadcast even in the absence of requests to indicate what Files exist in the network.
-A client can use requests to pull for regions of a File which can span from individual fragments to the whole file.
+A client can use requests to poll for fragments of a File which can span from individual fragments to the whole file.
 A client which has successfully downloaded any number of fragments of a File can then serve those fragments.
 %%Two different matching steps are established.
 Matching is a two-step process.
+% jrw:  mu_0 came out of left field.
 The first step applies $\mu_0$ to two File IDs to determine whether a match is possible between the two Files.  
 The second step applies $\mu_1$ to the two Files to determine whether there is a match.
 If $\mu_1$($f_1$,$f_2$) is true, $\mu_0$($fid_1$,$fid_2$) must be true.
