@@ -117,51 +117,31 @@ Section~\ref{related_work} contains an overview of related work and we offer our
 
 \section{Model\label{model}}
 
-Moving data across a network can take a variety of different forms. These forms correspond to different user needs, and consequently different protocols. Multicast File Transfer Protocol (MFTP) addresses the need to move immutable data between many different nodes in a fully distributed network. 
-%% This is useful for 1) device discovery 2) file transfer in the absence of many technologies (including internet). the only thing that is necessary is computers with routing and broadcast/multicast enabled 3) maximizing the reach of a gossip style network
+Moving data across a network can take a variety of forms. These forms correspond to different user needs and consequently different protocols. Multicast File Transfer Protocol (MFTP) addresses the need to move immutable data between many different nodes in a fully distributed network. 
+%% This is useful for 1) device discovery 2) File transfer in the absence of many technologies (including internet). the only thing that is necessary is computers with routing and broadcast/multicast enabled 3) maximizing the reach of a gossip style network
+\paragraph {Components.}
 The protocol employs a number of conceptually simple structures--a reflection of its overall simplicity, both in design and in purpose.
-One of these structures is aptly called a file. 
+One of these structures is called a File. 
 Files are a sequence of bytes with a length and a user-defined type; they are broken down into equally sized pieces called fragments.  
-Each file has a respective file ID, which is a structure that contains a hash, length, and type. 
-Each file ID is unique to its file.
-From these different file and file ID's a matching concept is established.
-Given a file $f_1$ and $f_2$, one can define a matching predicate $\mu$.
-Finally, there are three types of files which are conceptually important to the protocol, the first of which being a request.
-A request contains a file ID and a set of fragment indices. 
-We implemented requests as the file ID and a set of contiguous regions.  
-However, one can envision the request to contain anything that defines a set.
-The second type is a fragment, which consists of a file ID, fragment index, and the data itself.
-Last of all is a match, which consists of a file ID and a set of matching files.
-\paragraph {}
-With all of the conceptual structures in place, it is time to define their interactions.
-%% TODO: change above transition, it is terrible but I couldn't think of anything else at the time.
-In a simple scenario, if you get a request for a file you have fragments for, you can send those fragments out.
-Fragments are periodically broadcasted to indicate what files exist in the network.
-A client can use requests to pull for file fragments.
-Two different types of matching can be established.
-%% There are two different types of matching which are not commutative (??). 
-The first using $\mu_0$ to take two file ID's and determine whether there could be a match between the two files.  
-The second using $\mu_1$ to take two files and determine whether or not there is a match.
-However, the two matching predicates are not commutative.
-If $mu_1$($f_1$,$f_2$), $mu_0$($f_1$,$f_2$) must be true.
-However, if $mu_0$($f_1$,$f_2$) is true, $mu_1$($f_1$,$f_2$) does \emph{not} have to be true. 
-%% Communicating with external resources such as the operating system or physical environment is foundational to writing useful programs.
-%% Consider the history of I/O in the C run-time library.
-%% The synchronous function call semantics of the C programming language made it possible to write system calls, e.g., read and write, that transfer control to the operating system which then completes the operation and return control to the process after the system call.
-%% This is called \emph{blocking I/O} because the process blocks while it waits for the operating system to complete the I/O.
-%% Blocking I/O has the severe restriction that only one I/O source can be used at a time.
-%% To remedy this, system calls such as select and poll were introduced that allow a process to monitor I/O sources for events and then respond to these events.
-%% Asynchronous I/O was a further advancement that allows for the system (instead of the process) to dispatch a function upon the completion of I/O.
-
-%% Interrupts are difficult to use correctly.
-
-%%I/O Automata
-%%\begin{itemize}
-%%  \item Compare with UNITY
-%%  \item Compare with esterel
-%%  \item Compare with pi calculus
-%%  \item Compare with Ptolemy
-%%\end{itemize}
+Each File has a respective File ID, which is a structure that contains a hash of the file content, length, and type. 
+Each File ID is unique to its File.
+From these different File and File IDs a matching concept is established: given a File $f_1$ and $f_2$, one can define a matching predicate $\mu$.
+Finally, there are three types of Files which are conceptually important to the protocol, the first of which being a request.
+A request contains a File ID and a set of contiguous regions.  In our implementation, the set of contiguous regions was a set of fragment indices, but one can envision the request to contain anything that defines a set.
+%%A request contains a File ID and a set of fragment indices. 
+%%We implemented requests as the File ID and a set of contiguous regions.  
+%%However, one can envision the request to contain anything that defines a set.
+The second type is a fragment, which consists of a File ID, fragment index, and the data itself.
+Last of all is a match, which consists of a File ID and a set of matching File IDs.
+\paragraph {Component Interactions.}
+In a simple scenario, if one gets a request for a File one has fragments for, one can send those fragments out.
+Fragments are periodically broadcasted to indicate what Files exist in the network.
+A client can use requests to pull for File fragments, which can span from individual fragments to the whole file.
+Two different matching steps are established.
+The first uses $\mu_0$ to take two File ID's and determine whether there could be a match between the two Files.  
+If this is true, the second uses $\mu_1$ to take two Files and determine whether or not there is a match.
+If $\mu_1$($f_1$,$f_2$) is true, $\mu_0$($fid_1$,$fid_2$) must be true.
+However, if $\mu_0$($fid_1$,$fid_2$) is true, $\mu_1$($f_1$,$f_2$) does \emph{not} have to be true. 
 
 \section{I/O Automata Representation and Programming Model\label{representation}}
 
