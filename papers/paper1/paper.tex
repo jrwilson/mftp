@@ -1,11 +1,9 @@
 \documentclass[letterpaper]{article}
 
-\usepackage{outline}
-
 \begin{document}
 
-\title{An I/O Automata Framework for Distributed System Programming}
-\author{Justin R. Wilson \and Christopher D. Gill}
+\title{Multicast File Transfer Protocol}
+\author{Adam Drescher \and Magdalena Cassel}
 \date{}
 
 \maketitle
@@ -117,31 +115,32 @@ Section~\ref{related_work} contains an overview of related work and we offer our
 
 \pagebreak
 
-\section{System Model and Formalization\label{system_model}}
+\section{Model\label{model}}
 
-Our system model is influenced by the semantics of distributed systems, the semantics of devices, and the desire for conceptual integrity.
+Moving data across a network can take a variety of different forms. These forms correspond to different user needs, and consequently different protocols. Multicast File Transfer Protocol (MFTP) addresses the need to move immutable data between many different nodes in a fully distributed network.  
+%% This is useful for 1) device discovery 2) file transfer in the absence of many technologies (including internet). the only thing that is necessary is computers with routing and broadcast/multicast enabled 3) maximizing the reach of a gossip style network
+\paragraph{Files.}
+Files are a sequence of bytes with a length and a user-defined type. They are broken down into equally sized pieces called fragments.
 
-\paragraph{Local State.}
-First, we require that all modules manipulate local state only including modules that might be collocated on the same distributed node. 
-Said another way, there is no global or shared state.
-Computation designed around the manipulation of local state only is easily modularized and consequently, easier to distribute and execute concurrently.
+\paragraph{File ID's.}
+A structure that contains a hash, length, and type. Each file ID is unique to its file.
 
-\paragraph{Message Passing.}
-Nodes in distributed systems interact by passing messages over communication links.
-Message passing can either be synchronous or asynchronous.
-In synchronous message passing, the events of message production and delivery are the same, i.e., atomic.
-In asynchronous message passing, the events of message production and delivery are logically distinct events subject to being interposed by other events.
-Synchronous message passing is most often used between modules on the same node while asynchronous message passing is most often used between nodes.
-Both synchronous and asynchronous message passing are required.
-Synchronous message passing is necessary for building composable systems because of it association with atomicity.
-Asynchronous message passing is necessary for building real distributed systems as this matches the semantics of the networks found in practice.
+\paragraph{Matching.}
+Given a file $f_1$ and $f_2$, one can define a matching predicate $\mu$.
 
-\paragraph{Asynchronous Events.}
-Events are natural way to deal with the asynchrony involved in receiving messages from the network or interacting with the physical environment.
-A programming system for distributed systems, therefore, should provide semantics that allow modules to both generate and receive events in a general and principled way.
-Compare this to UNIX signals that are neither general (fixed-number with no associated data) nor principled
-
-
+\paragraph{Message types.}
+Request: a file ID and a set of fragment indices. We implemented requests as the file ID and a set of contiguous regions.  However, one can envision the request to contain anything that defines a set.
+Fragment: a file ID, fragment index, and the data itself.
+Match: a file ID and a set of matching files.
+\paragraph{How it's put together.} %% change
+In a simple scenario, if you get a request for a file you have fragments for, you can send those fragments out.
+Fragments are periodically broadcasted to indicate what files exist in the network.
+A client can use requests to pull for file fragments.
+There are two different types of matching which are not commutative (??). 
+The first using $\mu_0$ to take two file ID's and determine whether there could be a match between the two files.  
+The second using $\mu_1$ to take two files and determine whether or not there is a match.
+If $mu_1$($f_1$,$f_2$), $mu_0$($f_1$,$f_2$) must be true.
+However, if $mu_0$($f_1$,$f_2$) is true, $mu_1$($f_1$,$f_2$) does \emph{not} have to be true. 
 %% Communicating with external resources such as the operating system or physical environment is foundational to writing useful programs.
 %% Consider the history of I/O in the C run-time library.
 %% The synchronous function call semantics of the C programming language made it possible to write system calls, e.g., read and write, that transfer control to the operating system which then completes the operation and return control to the process after the system call.
@@ -151,47 +150,6 @@ Compare this to UNIX signals that are neither general (fixed-number with no asso
 %% Asynchronous I/O was a further advancement that allows for the system (instead of the process) to dispatch a function upon the completion of I/O.
 
 %% Interrupts are difficult to use correctly.
-
-\begin{outline}
-\item State
-  \begin{outline}
-  \item There is no shared state in a 
-  \item Local state only
-  \item Shared state
-    \begin{outline}
-      \item Impossible in distributed systems
-      \item Dangerous in local systems
-    \end{outline}
-  \end{outline}
-\item Communication
-  \begin{outline}
-  \item Atomic asynchronous message passing
-  \item Network sets size of atom (UDP)
-  \item Can build reliable streams (TCP)
-  \item Local equivalent is passing a value
-  \item Model should lend itself to writing protocols
-  \end{outline}
-\item Asynchrony
-  \begin{outline}
-    \item Model must have natural support for asynchrony, i.e., event-based
-    \item Leads to a more efficient implementation because changed state and enabled actions become obvious
-  \end{outline}
-\item Concurrency
-  \begin{outline}
-    \item Reason about systems using non-deterministic interleaving of atomic actions
-    \item Model should admit implementations that execute concurrently
-  \end{outline}
-\item Dynamics
-  \begin{outline}
-    \item Configuration - Edges in graph of communicating components can change at run-time.
-      \begin{outline}
-      \item Already required in distributed settings
-      \item Not addressed in formal models
-      \end{outline}
-    \item Extension - Nodes in graph of communicating components can change at run-time.
-  \end{outline}
-  \item Reflection
-\end{outline}
 
 I/O Automata
 \begin{itemize}
