@@ -130,19 +130,21 @@ Given two files $f_1$ and $f_2$, one can define a matching predicate $\mu$.
 
 \paragraph{Messages.}
 File transfer takes place via \emph{messages}.
-There are three types of messages in the protocol, the first of which being a \emph{request}.
-A \emph{request} contains a file ID and a set of fragment indices.
+There are three types of messages in the protocol.
+The first message type is a \emph{request}.
+A request contains a file ID and a set of fragment indices.
 We implemented requests as the file ID and a set of contiguous regions.  
 However, one can envision the request to contain anything that defines a set.
 The second message type is a \emph{fragment}, which consists of a file ID, a fragment index, and the data comprising that fragment of the file.
 Last is a \emph{match}, which consists of a file ID and a set of matching file IDs.
 
 \paragraph {Tasks.}
-MFTP is a peer-to-peer protocol since all participants can act as both a client and a server.
-In a simple scenario, if a peer gets a request for a file it has fragments for, it can send those fragments out.
-Fragments are periodically broadcast even in the absence of requests to indicate what files exist in the network.
+MFTP is a peer-to-peer protocol because each participant can act as both a client and a server.
+A peer can send out any fragments for which it gets a request.
+Fragments are periodically broadcast, even in the absence of requests, to indicate what files exist in the network.
 A peer can use requests to poll for fragments of a file which can span from individual fragments to the whole file.
 A peer which has successfully downloaded any number of fragments of a file can then serve those fragments.
+
 Matching is a two-step process.
 The first step applies a matching function $\mu_0$ to two file IDs to determine whether a match is possible between the two files.  
 The second step applies a matching function $\mu_1$ to the two files to determine whether there is a match.
