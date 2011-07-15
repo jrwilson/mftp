@@ -161,8 +161,12 @@ We used the ioa framework to develop an implementation of the MFTP protocol.  I/
 They change state via transitions classified as input, output or internal actions.
 Input and output actions in different automata are bound; output actions in the one serve as interrupts to trigger input actions in the other.
 
+\vspace{10 mm}
+
 %%General overview of the framework and formal model.
-\includegraphics[scale=0.55]{diagramOne}
+\includegraphics[scale=0.65]{diagramOne}
+
+\vspace{10 mm}
 
 %%Describe our implementation at the 50k ft view and work our way down until things are no longer interesting.
 In our implementation of MFTP, we defined a basic MFTP automaton, a sender and a receiver.
