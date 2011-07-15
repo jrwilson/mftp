@@ -520,25 +520,27 @@ namespace mftp {
     V_UP_OUTPUT (mftp_automaton, set_match_timer, ioa::time);
 
     void matching_timer_interrupt_effect () {
-      if (m_matchq.empty ()) {
-	// The match queue is empty.
-	// Resize and add all of the matches to it.
-	m_matchq.resize (m_matches.size ());
-	std::copy (m_matches.begin (), m_matches.end (), m_matchq.begin ());
-      }
-
-      uint32_t count = 0;
-      fileid matches[MATCHES_SIZE];
-      while (count < MATCHES_SIZE && !m_matchq.empty ()) {
-	matches[count] = m_matchq.front ();
-	m_matchq.pop_front ();
-	++count;
-      }
-
-      if (count > 0) {
-	message_buffer* m = new message_buffer (match_type (), m_fileid, count, matches);
- 	m->convert_to_network ();
-	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+      if (!m_matches.empty ()) {
+	if (m_sendq.empty ()) {
+	  if (m_matchq.empty ()) {
+	    // The match queue is empty.
+	    // Resize and add all of the matches to it.
+	    m_matchq.resize (m_matches.size ());
+	    std::copy (m_matches.begin (), m_matches.end (), m_matchq.begin ());
+	  }
+	  
+	  uint32_t count = 0;
+	  fileid matches[MATCHES_SIZE];
+	  while (count < MATCHES_SIZE && !m_matchq.empty ()) {
+	    matches[count] = m_matchq.front ();
+	    m_matchq.pop_front ();
+	    ++count;
+	  }
+	  
+	  message_buffer* m = new message_buffer (match_type (), m_fileid, count, matches);
+	  m->convert_to_network ();
+	  m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+	}
       }
 
       m_matching_timer_state = SET_READY;
