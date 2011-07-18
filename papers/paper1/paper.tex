@@ -1,6 +1,6 @@
 \documentclass[letterpaper]{article}
 \usepackage{graphicx}
-\usepackage{outline}
+
 \begin{document}
 
 \title{A protocol for implementing read-only databases in dynamic distributed environments}
@@ -14,87 +14,83 @@ The abstract abstract.
 \end{abstract}
 
 \section{Introduction}
+The proliferation of embedded networking is transforming homes into distributed computing environments.
+A variety of devices, including desktops, laptops, tablets, printers, digital picture frames, televisions, digital cameras, and optical disc players, are now equipped with wireless network interfaces.
+The ability of these devices to communicate with one another is creating opportunities for applications that engage multiple devices.
+Typically, these networks will consist of a small to moderate number of devices, many of which are resource-constrained.
+Home networks are built up as users contribute new devices to the network.
+When a new device is added, i.e., turned on, the user expects the device to be available in a timely fashion.
 
-Dynamic distributed systems are often governed by immutable or slowly changing configuration information contributed by each node in the system.
-A common problem is listing all of the participants
+Applications in home networks, and other dynamic distributed systems, are often governed by immutable configuration records contributed by each node in the system.
+A simple directory application might gather and display a list of all of the devices in the system.
+Similarly, applications using discovery and advertisement are governed by the service specifications and descriptions contributed by service consumers and providers.
+One of the tasks in the system, then, is to match specifications to descriptions for the purpose of service binding.
 
-For example, systems that use discovery and advertisement are governed by service specifications and descriptions contributed by service consumers and providers.
-%  A recurring problem in dynamic distributed systems is the collection and processing of configuration information.
+Both centralized and distributed algorithms have been proposed to collect and process configuration records.
+Centralized algorithms elect a leader which then facilitates query processing.
+The leader may perform the processing itself or delegate processing to a subordinate node.
+Distributed algorithms for configuration record processing often use one of two techniques, depending on the size of the records.
+If the records are bigger than the maximum size of a message, i.e., a UDP packet, nodes discover other nodes using broadcast messages and then use point-to-point connections to collect remote configuration records.
+Using this approach, the $n$th node to join the network will be queried $n-1$ times.
+If the records are smaller than the maximum size of a message, nodes exchange configuration records using a multicast network, e.g., the Multicast Domain Name System.
 
-Both centralized and distributed algorithms have been proposed to collect and process configuration information.
-Centralized algorithms elect a leader which then facilitates the collection of configuration information and query processing.
-The leader might perform the processing itself or delegate processing to a subordinate.
-Distributed algorithms for configuration information collection and processing often use one of two techniques depending on the size of the records.
-If the records are bigger than the size of a message in the network, i.e., a UDP packet, then nodes discover other nodes using broadcast messages and then use point-to-point connections to collect and process the configuration information.
-If the records are smaller than the size of a message in the network, then the nodes exchange data using a multicast network, e.g., the Multicast Domain Name System.
+To collect and process configuration records in home networks, we require a protocol that is both fully distributed and supports records of arbitrary size.
+The resource-poor nature of the devices in the network, combined with the dynamic nature of the network, implies that a fully distributed algorithm is more appropriate.
+In order to do capabilities-based matching, we require the ability to support configuration records of arbitrary size.
+Finally, we would like to use gossip to avoid sending duplicate records when a new node joins the network.
 
-An unexplored area of the design space is techniques that support 
+This paper describes the Multicast File Transfer Protocol (MFTP), a distributed dissemination protocol for home networks that supports records of arbitrary size.
 
-The problem of processing the configuration information can be cast using database techniques.
-Continuing the example, a service specification is a record in a table of service specifications and the process of discovery involves projecting the specification record on to the table of service descriptions.
-
-
-
-A recurring problem in dynamic distributed environments Read-only datab
-
-Dynamic distributed systems often require a protocol that allows a node to share public immutable data with all of the other nodes in the system.
-A typical example is discovery where service specifications are compared against service descriptions to match service providers with service consumers.
-Service descriptions and specifications are immutable even though they might exist at different times in the system since the set of nodes and therefore service providers and consumers may change with time.
-The immutability and public nature of the data implies that it can be freely replicated and therefore learned by gossiping.
-
-
-
-
-
-
-Often, the number of times the data is read is proportional to the number of nodes.
-
-
-
-
-
-There's a number of ways to do this.
-1.  Centralized approach where a leader becomes a data broker
-2.  Discover other nodes and then poll them.
-
-The main problem with the first approach is that its centralized.
-A problem with the second approach is that its inefficient (if you are n then you will be contacted n - 1 times).
-
-By dynamic, we mean that components come in and out.
-
-We assume a moderately sized ad hoc wireless network.
-
-We would like to take advantage of gossip.
-We would like to be fully distributed.
-
-Thus we developed a dissemination protocol for remote data exchange in wireless networks.
-
-Moving data across a network can take a variety of forms. 
-These forms correspond to different user needs and consequently different protocols. 
-Multicast File Transfer Protocol (MFTP) addresses the need to move immutable data between many different nodes in a fully distributed network. 
+%Moving data across a network can take a variety of forms. 
+%These forms correspond to different user needs and consequently different protocols. 
+%Multicast File Transfer Protocol (MFTP) addresses the need to move immutable data between many different nodes in a fully distributed network. 
 %% This is useful for 1) device discovery 2) File transfer in the absence of many technologies (including internet). the only thing that is necessary is computers with routing and broadcast/multicast enabled 3) maximizing the reach of a gossip style network
 
 \section{Model\label{model}}
 
+We want to establish relationships between configuration records, which means we need to be able to download configuration records.
+
+%% The problem of processing configuration information can be cast using relational database techniques.
+%% A database consists of one or more tables, where each table consists of a number of identically structured records.
+%% Database tables are manipulated by the insert, delete and update methods, which insert, delete and modify records.
+%% Database tables are queried using the select operator.
+%% For processing configuration information, each configuration record is mapped into a table of the appropriate type.
+%% Listing all of the components in the system corresponds to selecting all of the records in the database.
+%% Discovery can be accomplished by projecting a service specification record onto the table of service descriptions.
+
+%% A record is defined by its content.
+%% Consequently, each record is immutable and the update method is not allowed.
+%% Configuration records are immutable and under the control of the node that stores them.
+
+
+
+%% Each record is immutable. Update doesn't exist. The records stored on each node are under the control of that node. Insert and delete only exist locally.
+
+%% Each table and each record has an ID
+%% Each record ID consists of the ID of the table it belongs to and the length and hash of its binary representation.
+%% The records are uniquely identifiable by their IDs.
+%% Each node then contributes zero or more immutable records to one or more of the tables.
+%% We can consider each configuration item as a record in a read-only database.
+
+%% Each record is locally controlled
+%% since immutable, can be replicated (no duplicates in the database)
+%% each node has its own set of records which it contributes
+
+Files are an abstraction of the configuration record.
+
 \paragraph {Files.}
 The main concept in MFTP is that of a \emph{file}.
+
 A file is a sequence of bytes with a length and a user-defined type.
-Files are broken down into pieces of equal size called \emph{fragments}.
-Each file is uniquely identified by a \emph{file ID} that contains the file's type, length, and a hash of the file's content.
+Files are divided into pieces of equal size called \emph{fragments}.
+Each file is uniquely identified by a \emph{file ID} that contains the file's type, length, and a hash of the file's contents.
+
 % TODO:  We need to move this.
 % Given two files $f_1$ and $f_2$, one can define a matching predicate $\mu$.
 
-\paragraph{Messages.}
-File transfer takes place via \emph{messages}.
-There are three types of messages in the protocol.
-The first message type is a \emph{request}.
-A request contains a file ID and a set of fragment indices.
-We implemented requests as the file ID and a set of contiguous regions.  
-However, one can envision the request to contain anything that defines a set.
-The second message type is a \emph{fragment}, which consists of a file ID, a fragment index, and the data comprising that fragment of the file.
-Last is a \emph{match}, which consists of a file ID and a set of matching file IDs.
-
 \paragraph {Tasks.}
+The two main tasks in MFTP are acquiring a file and establishing a relationship between two files.
+The process of acquiring a file involves sending a request for the file's fragments and receiving fragments sent in response.
 MFTP is a peer-to-peer protocol because each participant can act as both a client and a server.
 A peer can send out any fragments for which it gets a request.
 Fragments are periodically broadcast, even in the absence of requests, to indicate what files exist in the network.
@@ -106,6 +102,17 @@ The first step applies a matching function $\iota$ to two file IDs to determine 
 The second step applies a matching function $\mu$ to the two files to determine whether there is a match.
 If $\mu$($f_1$,$f_2$) is true, $\iota$($fid_1$,$fid_2$) must be true.
 However, if $\iota$($fid_1$,$fid_2$) is true, $\mu$($f_1$,$f_2$) does \emph{not} have to be true. 
+
+\paragraph{Messages.}
+File transfer takes place via \emph{messages}.
+There are three types of messages in the protocol.
+The first message type is a \emph{request}.
+A request contains a file ID and a set of fragment indices.
+We implemented requests as the file ID and a set of contiguous regions.  
+However, one can envision the request to contain anything that defines a set.
+The second message type is a \emph{fragment}, which consists of a file ID, a fragment index, and the data comprising that fragment of the file.
+Last is a \emph{match}, which consists of a file ID and a set of matching file IDs.
+
 
 %%TODO: Talk about validation
 
