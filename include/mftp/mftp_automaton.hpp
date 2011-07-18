@@ -266,14 +266,14 @@ namespace mftp {
       case FRAGMENT:
 	{
 	  // If we are looking for our own file, it must be a fragment from our file and the offset must be correct.
-	  if (!m_file.complete () &&
-	      m->frag.fid == m_fileid &&
+	  if (m->frag.fid == m_fileid &&
 	      m->frag.offset < m_mfileid.get_final_length () &&
 	      m->frag.offset % FRAGMENT_SIZE == 0) {
 	    
 	    // Save the fragment.
-	    m_file.write_chunk (m->frag.offset, m->frag.data);
-	    
+	    if (!m_file.complete ()){
+	      m_file.write_chunk (m->frag.offset, m->frag.data);
+	    }
 	    uint32_t idx = (m->frag.offset / FRAGMENT_SIZE);
 	    if (m_requests[idx]) {
 	      // Somebody else wanted it and now has just seen it.
