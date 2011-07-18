@@ -3,7 +3,7 @@
 
 \begin{document}
 
-\title{A protocol for implementing read-only databases in dynamic distributed environments}
+\title{A gossip-based protocol for exchanging immutable data in dynamic distributed environments}
 \author{Adam Drescher \and Magdalena Cassel}
 \date{}
 
@@ -48,7 +48,77 @@ This paper describes the Multicast File Transfer Protocol (MFTP), a distributed 
 
 \section{Model\label{model}}
 
-We want to establish relationships between configuration records, which means we need to be able to download configuration records.
+The two main tasks in configuration record processing are acquiring records from the network and establishing a relationship between two records.
+We adopt the view that configuration records can be serialized and stored in a file.
+The task of acquiring a record is then equivalent to downloading a file from the network.
+Once a configuration record has been downloaded, its content can then be compared to configuration records that are stored locally.
+
+A \emph{file} in MFTP is a finite sequence of bytes with an associated type.
+Each file is uniquely identified by its \emph{file ID} which contains the file's type, length, and a hash of the file's contents.
+The type is defined by the user and is used to limit the potential relationships among files.
+We assume the existence of a user-defined predicate $\gamma(fid_1, fid_2)$ that returns true if there is potentially a relationship between the two files.
+The predicate $\gamma$ is symmetric, i.e., $\gamma(fid_1, fid_2) = \gamma(fid_2, fid_1)$ and non-reflexive, i.e., $\gamma(fid_1, fid_1)$ is false.
+Note that $\gamma$ is only defined using file IDs and can therefore only check file types and lengths.
+We also assume the existence of a user-defined predicate $\mu(file_1, file_2)$ that returns true if a relationship between $file_1$ and $file_2$ exists.
+Like $\gamma$, the predicate $\mu$ is symmetric and non-reflexive.
+The predicate $\mu$ implies $\gamma$, i.e., $\mu(file_1, file_2) \to \gamma(fid(file_1), fid(file_2))$.
+
+MFTP assumes that all communication takes place by sending fixed-size messages over a broadcast or multicast channel.
+This allows MFTP to take advantage of gossip since file contents and matching relationships can be communicated efficiently to multiple interested parties.
+To enable the sending of file contents using fixed-size messaging, we divide a file into pieces of equal size called \emph{fragments}.
+
+The MFTP protocol contains three types of messages: fragments, requests, and matches.
+Each message in MFTP is prefixed with a header indicating its type.
+A \emph{fragment message} consists of a file ID, a fragment index, and the data comprising the indicated fragment.
+A \emph{request message} consists of a file ID and a set of fragment indices.
+For example, our implementation uses a set of spans where each span requests a contiguous set of fragments.
+However, one can envision the request to contain more advanced structures, e.g., functions, that can define arbitrary sets.
+A \emph{match message} consist of a file ID and a set of matching file IDs for which $\gamma$ is true.
+
+Two files with the same content and type will have the same file ID.
+With a strong enough hashing mechanism, we can assume two files are equal if their file IDs are the same.
+Since the identity of a file is completely determined by its content, files are immutable and can be freely replicated.
+Peers in the protocol are free to cache any fragment and respond to any requests for which they have a fragment.
+The process of acquiring a file consists of repeatedly sending requests and receiving fragments from any peers that chose to respond until all of the fragments have been acquired.
+
+Learning relationships can be accomplished in one of two ways.
+First, peers in MFTP periodically send a fragment to announce the presence of the file in the network.
+Assume that a peer serving $file_1$ receives an announcement for $file_2$.
+The peer checks $\gamma(fid(file_1), fid(file_2))$ to determine whether a relationship is possible.
+If a relationship is possible, the peer acquires the file and checks $\mu(file_1, file_2)$ to determine whether the relationship exists.
+Peers periodically send match messages to indicate which files have a relationship with the file they serve.
+The second way relationships can be learned is by eavesdropping on the match messages sent by other peers.
+
+%% \paragraph {Files.}
+%% The main concept in MFTP is that of a \emph{file}.
+%% A file is a sequence of bytes with a length and a user-defined type.
+%% Files are divided into pieces of equal size called \emph{fragments}.
+%% Each file is uniquely identified by a \emph{file ID} that contains the file's type, length, and a hash of the file's contents.
+
+%% \paragraph{Messages.}
+%% File transfer takes place via \emph{messages}.
+%% There are three types of messages in the protocol.
+%% The first message type is a \emph{request}.
+%% A request contains a file ID and a set of fragment indices.
+%% We implemented requests as the file ID and a set of contiguous regions.  
+%% However, one can envision the request to contain anything that defines a set.
+%% The second message type is a \emph{fragment}, which consists of a file ID, a fragment index, and the data comprising that fragment of the file.
+%% Last is a \emph{match}, which consists of a file ID and a set of matching file IDs.
+
+%% \paragraph {Tasks.}
+%% The two main tasks in MFTP are acquiring a file and establishing a relationship between two files.
+%% The process of acquiring a file involves sending a request for the file's fragments and receiving fragments sent in response.
+%% MFTP is a peer-to-peer protocol because each participant can act as both a client and a server.
+%% A peer can send out any fragments for which it gets a request.
+%% Fragments are periodically broadcast, even in the absence of requests, to indicate what files exist in the network.
+%% A peer can use requests to poll for fragments of a file which can span from individual fragments to the whole file.
+%% A peer which has successfully downloaded any number of fragments of a file can then serve those fragments.
+
+%% Matching is a two-step process.
+%% The first step applies a matching function $\iota$ to two file IDs to determine whether a match is possible between the two files.  
+%% The second step applies a matching function $\mu$ to the two files to determine whether there is a match.
+%% If $\mu$($f_1$,$f_2$) is true, $\iota$($fid_1$,$fid_2$) must be true.
+%% However, if $\iota$($fid_1$,$fid_2$) is true, $\mu$($f_1$,$f_2$) does \emph{not} have to be true. 
 
 %% The problem of processing configuration information can be cast using relational database techniques.
 %% A database consists of one or more tables, where each table consists of a number of identically structured records.
@@ -62,8 +132,6 @@ We want to establish relationships between configuration records, which means we
 %% Consequently, each record is immutable and the update method is not allowed.
 %% Configuration records are immutable and under the control of the node that stores them.
 
-
-
 %% Each record is immutable. Update doesn't exist. The records stored on each node are under the control of that node. Insert and delete only exist locally.
 
 %% Each table and each record has an ID
@@ -76,47 +144,9 @@ We want to establish relationships between configuration records, which means we
 %% since immutable, can be replicated (no duplicates in the database)
 %% each node has its own set of records which it contributes
 
-Files are an abstraction of the configuration record.
-
-\paragraph {Files.}
-The main concept in MFTP is that of a \emph{file}.
-
-A file is a sequence of bytes with a length and a user-defined type.
-Files are divided into pieces of equal size called \emph{fragments}.
-Each file is uniquely identified by a \emph{file ID} that contains the file's type, length, and a hash of the file's contents.
-
-% TODO:  We need to move this.
-% Given two files $f_1$ and $f_2$, one can define a matching predicate $\mu$.
-
-\paragraph {Tasks.}
-The two main tasks in MFTP are acquiring a file and establishing a relationship between two files.
-The process of acquiring a file involves sending a request for the file's fragments and receiving fragments sent in response.
-MFTP is a peer-to-peer protocol because each participant can act as both a client and a server.
-A peer can send out any fragments for which it gets a request.
-Fragments are periodically broadcast, even in the absence of requests, to indicate what files exist in the network.
-A peer can use requests to poll for fragments of a file which can span from individual fragments to the whole file.
-A peer which has successfully downloaded any number of fragments of a file can then serve those fragments.
-
-Matching is a two-step process.
-The first step applies a matching function $\iota$ to two file IDs to determine whether a match is possible between the two files.  
-The second step applies a matching function $\mu$ to the two files to determine whether there is a match.
-If $\mu$($f_1$,$f_2$) is true, $\iota$($fid_1$,$fid_2$) must be true.
-However, if $\iota$($fid_1$,$fid_2$) is true, $\mu$($f_1$,$f_2$) does \emph{not} have to be true. 
-
-\paragraph{Messages.}
-File transfer takes place via \emph{messages}.
-There are three types of messages in the protocol.
-The first message type is a \emph{request}.
-A request contains a file ID and a set of fragment indices.
-We implemented requests as the file ID and a set of contiguous regions.  
-However, one can envision the request to contain anything that defines a set.
-The second message type is a \emph{fragment}, which consists of a file ID, a fragment index, and the data comprising that fragment of the file.
-Last is a \emph{match}, which consists of a file ID and a set of matching file IDs.
-
+\section{Implementation}
 
 %%TODO: Talk about validation
-
-\section{Implementation}
 
 %%TODO: Talk about validation - possible coinage 'incremental digest'
 

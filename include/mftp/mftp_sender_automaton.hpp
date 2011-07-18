@@ -41,7 +41,7 @@ namespace mftp {
       add_observable (&send);
       add_observable (&send_complete);
 
-      ioa::automaton_manager<ioa::udp_sender_automaton>* sender = new ioa::automaton_manager<ioa::udp_sender_automaton> (this, ioa::make_generator<ioa::udp_sender_automaton> ());
+      ioa::automaton_manager<ioa::udp_sender_automaton>* sender = new ioa::automaton_manager<ioa::udp_sender_automaton> (this, ioa::make_generator<ioa::udp_sender_automaton> (sizeof (message)));
 
       ioa::make_binding_manager (this,
 				 &m_self, &mftp_sender_automaton::send_out,
