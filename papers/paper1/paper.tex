@@ -1,131 +1,88 @@
 \documentclass[letterpaper]{article}
 \usepackage{graphicx}
+\usepackage{outline}
 \begin{document}
 
-\title{Multicast File Transfer Protocol}
+\title{A protocol for implementing read-only databases in dynamic distributed environments}
 \author{Adam Drescher \and Magdalena Cassel}
 \date{}
 
 \maketitle
 
 \begin{abstract}
-In an effort to be portable, system developers often favor existing architectures, languages, operating systems, and standard libraries.
-The dominant abstraction in established computing technologies for concurrency and therefore distributed system development is threads.
-Consequently, distributed system developers are locked into using threads and experience the difficulties of thread-based development including obscure race conditions, poor support for the semantics of distributed systems, and difficulties integrating software developed using different thread models.
-Furthermore, the demand for portability and generality dismisses many of the techniques proposed in research that involve new programming languages, language extensions, or domain-specific solutions.
-This paper presents a development framework based on the I/O automata formal model implemented in C++.
-The I/O automata model is a proven technique for distributed system design because its semantics match those found in distributed systems.
-With the framework, developers can reason about correctness directly from the program text using the I/O automata formalism.
-The I/O  automata model also provides a common abstraction for concurrency which facilitates software integration and promotes reuse.
-TODO:  What are we doing for evaluation?
-%% Our ability to realize sophisticated distributed systems such as those in cyber-physical systems and pervasive computing is predicated on a solid model and implementation of asynchrony and concurrency.
-%% Threads, the de facto standard in practice, are not a suitable foundation because 1) ad hoc communication among threads prohibits software reuse, 2) threads are difficult to treat formally and therefore \emph{very} difficult to treat informally, and 3) threads are ill-suited for the asynchronous semantics present in the systems we desire to build.
-%% In this paper, we outline the semantics necessary for building sophisticated distributed systems and connect these to the I/O automata formal model.
-%% We then describe an implementation of the I/O automata formal model and cover extensions to the model necessary for operating in a dynamic environment.
-%% Finally, we conclude with an evaluation of our I/O automata framework.
+The abstract abstract.
 \end{abstract}
 
 \section{Introduction}
-% jrw:  Move this to the introduction.
-Moving data across a network can take a variety of forms. These forms correspond to different user needs and consequently different protocols. Multicast File Transfer Protocol (MFTP) addresses the need to move immutable data between many different nodes in a fully distributed network. 
+
+Dynamic distributed systems are often governed by immutable or slowly changing configuration information contributed by each node in the system.
+A common problem is listing all of the participants
+
+For example, systems that use discovery and advertisement are governed by service specifications and descriptions contributed by service consumers and providers.
+%  A recurring problem in dynamic distributed systems is the collection and processing of configuration information.
+
+Both centralized and distributed algorithms have been proposed to collect and process configuration information.
+Centralized algorithms elect a leader which then facilitates the collection of configuration information and query processing.
+The leader might perform the processing itself or delegate processing to a subordinate.
+Distributed algorithms for configuration information collection and processing often use one of two techniques depending on the size of the records.
+If the records are bigger than the size of a message in the network, i.e., a UDP packet, then nodes discover other nodes using broadcast messages and then use point-to-point connections to collect and process the configuration information.
+If the records are smaller than the size of a message in the network, then the nodes exchange data using a multicast network, e.g., the Multicast Domain Name System.
+
+An unexplored area of the design space is techniques that support 
+
+The problem of processing the configuration information can be cast using database techniques.
+Continuing the example, a service specification is a record in a table of service specifications and the process of discovery involves projecting the specification record on to the table of service descriptions.
+
+
+
+A recurring problem in dynamic distributed environments Read-only datab
+
+Dynamic distributed systems often require a protocol that allows a node to share public immutable data with all of the other nodes in the system.
+A typical example is discovery where service specifications are compared against service descriptions to match service providers with service consumers.
+Service descriptions and specifications are immutable even though they might exist at different times in the system since the set of nodes and therefore service providers and consumers may change with time.
+The immutability and public nature of the data implies that it can be freely replicated and therefore learned by gossiping.
+
+
+
+
+
+
+Often, the number of times the data is read is proportional to the number of nodes.
+
+
+
+
+
+There's a number of ways to do this.
+1.  Centralized approach where a leader becomes a data broker
+2.  Discover other nodes and then poll them.
+
+The main problem with the first approach is that its centralized.
+A problem with the second approach is that its inefficient (if you are n then you will be contacted n - 1 times).
+
+By dynamic, we mean that components come in and out.
+
+We assume a moderately sized ad hoc wireless network.
+
+We would like to take advantage of gossip.
+We would like to be fully distributed.
+
+Thus we developed a dissemination protocol for remote data exchange in wireless networks.
+
+Moving data across a network can take a variety of forms. 
+These forms correspond to different user needs and consequently different protocols. 
+Multicast File Transfer Protocol (MFTP) addresses the need to move immutable data between many different nodes in a fully distributed network. 
 %% This is useful for 1) device discovery 2) File transfer in the absence of many technologies (including internet). the only thing that is necessary is computers with routing and broadcast/multicast enabled 3) maximizing the reach of a gossip style network
-
-Advances in embedded systems and networking are paving the way for distributed systems of unprecedented sophistication.
-Cyber-physical systems go beyond the traditional embedded system paradigm by explicitly modeling the dynamics of the physical system and communication network in the computational task.
-The inclusion of wireless network interfaces in modern electronic devices is transforming our homes, offices, and hospitals into pervasive computing environments.
-The interactions these systems have with the physical environment and its community of users require a degree of interoperability, configurability, adaptability, scalability, robustness, and security not found in existing systems.
-
-One of the forces that prevents the development of any kind of sophisticated software system is accidental complexity~\cite{brooks_nsb}.
-In the context of distributed systems, a major source of accidental complexity is a mismatch between the conceptual model of the system and the technology used to implement the system.
-The mismatch between the conceptual model and implementation method introduces defects due to translation errors, slows rapid prototyping, and retards iterative refinement.
-While there is no ``silver bullet''~\cite{brooks_nsb}, reducing the accidental complexity derived from the mismatch between concept and implementation will increase productivity and make new levels of sophistication possible with existing levels of effort.
-
-Threads are the de facto implementation vehicle for most of computing including distributed systems.
-Threads dominate because modern processors, programming languages, and operating systems were all developed to support the thread model.
-Furthermore, the widespread availability of thread libraries makes them a natural choice for system development.
-While threads dominate in practice, using threads to develop systems has a number of significant drawbacks.
-
-First, ad hoc communication among threads prohibits software reuse.
-To illustrate this problem consider the challenge of developing an application with a graphical user interface that also uses a multi-threaded middleware library.
-Graphical user interfaces often use a single-threaded event-based design, e.g., X, Swing.
-The system integrator must write glue code that bridges the single-threaded event-based semantics to multi-threaded semantics.
-Bridging between two thread models is achievable, however, the systems we desire to build will rely on many libraries each with their own thread model.
-The importance of a unified approach to concurrency becomes apparent when one considers bridging between different threading models, e.g., event-based, reactor, proactor, active objects, and their attributes, e.g., priority, thread-creation, blocking vs. non-blocking I/O.
-
-Second, threads are difficult to treat formally and therefore \emph{very} difficult to treat informally.
-The correctness of programs is reasoned about either formally as part of formal software design and verification and/or informally during the debugging process.
-Since most programs will never be formally verified, the correctness of most programs hinges solely on the developers ability to reason about the program.
-Based on the historical example of structured programming~\cite{goto_considered_harmful}, there is a strong correlation between what is ``easy'' in the formal arena and what is ``easy'' in the informal arena, especially when the implementation mimics the formal model, e.g., structured programming languages.
-It is well known that a formal treatment of threads is difficult due to the arbitrary interleaving of critical sections and ability to define critical sections of arbitrary scope~\cite{lee_threads}.
-Thus, the correctness of most multi-threaded programs hinges on the developer's ability to explore arbitrary interleavings of critical sections, i.e., model checking, in their head.
-
-Third, threads are ill-suited for the asynchronous semantics present in the systems we desire to build.
-The distributed systems we desire to build are asynchronous at both the device and network levels.
-Embedded devices must respond to asynchronous events in the environment.
-The interrupt-driven TinyOS operating system for wireless sensor network motes is an exemplar in this area.
-The fundamental communication primitive in real-world distributed systems is asynchronous message passing.
-Realizing asynchrony in a threaded program requires the use of signals (interrupts) and/or (a)synchronous I/O multiplexing.
-Signals are primitive, rigid, and difficult to use correctly.
-Synchronous I/O multiplexing, e.g., a select loop, is limited to operating system abstractions, e.g., file descriptors, and induces a reactive state machine structure that is difficult to understand and maintain.
-Asynchronous I/O improves efficiency by avoiding the dispatching necessary to determine the I/O operation but are subject to the same limitations of shared-state thread-based programming.
-
-Difficulties in developing asynchronous and concurrent software using threads has prompted a number of concurrent programming languages, e.g., Esterel, Erlang, Ptolemy, Autopipe, and language extensions, e.g., OpenMP, Cilk, Split-C.
-Solutions that involve creating a new language or extending an existing language suffer from two main problems.
-First, such solutions are often domain-specific and do not generalize to different applications, a necessity for heterogeneous distributed systems.
-Furthermore, solutions not connected to a general-purpose formal model lack the important property that the complete system including the environment can be modeled as another component.
-Second, such solutions often fail to become mainstream due to practical considerations.
-For example, the combination of C and pthreads is much more popular than Erlang due to the popularity of C-like languages and C's connection with UNIX operating system.
-Most language extensions are targeted at niche markets and therefore never standardized and implemented in mainstream compilers.
-
-Thus, in order to build sophisticated distributed systems, we require a common semantics and model for building concurrent and asynchronous systems with straight-forward abstractions.
-%% The model must be general to support the wide variety of devices and protocols necessary for cyber-physical and pervasive computing systems.
-%% The model must facilitate the development of concurrent modules that can be reused.
-%% The model must have a strong connection with a formal model to simplify the task of reasoning about individual components and complete systems.
-%% The model must be implemented in such a way that it is easily approachable.
-In section~\ref{system_model}, we expound upon the requirements of the model and connect the requirements with the I/O automata formal model.
-Section~\ref{representation} describes how I/O automata are represented in our I/O automata framework.
-In section~\ref{design}, we describe the design and implementation of our I/O automata framework.
-Section~\ref{evaluation} provides an evaluation and discussion of our framework.
-Section~\ref{related_work} contains an overview of related work and we offer our conclusions and thoughts for future work in section~\ref{conclusion}.
-
-%% We provide a common semantics and model for building concurrent and asynchronous systems with straight-forward abstractions.
-
-%%formal models, e.g., UNITY, I/O Automata,
-
-%% Devices are asynchronous and concurrent.
-%% Networks are asynchronous and concurrent.
-%% Why not start with a model that is asynchronous and concurrent?
-
-%% What inspires us:
-%% \begin{itemize}
-%%   \item CORBA - Remote Method Invocation (Remote Procedure Call with a ``this'' pointer).
-%%     ``Let's make synchronous function calls over a network.''
-%%     Assumes a thread of control.
-%%     Asynchronous calls were added later (Did these result in obfuscation?)
-
-%%   \item Patterns for asynchronous concurrency in a synchronous, thread-based world: Active objects, Reactor, Proactor, etc.
-%%     Examples: X server, OS2 Presentation Manager, Java Swing
-
-%%   \item AJAX - The modern Web is built on JavaScript + \emph{asynchronous} web page requests = AJAX.
-
-%%   \item Michi Henning - ICE
-
-%%   \item Steve Vinoski - Toolbox of programming languages
-
-%% \end{itemize}
-
-%% We provide a common semantics and model for building concurrent and asynchronous systems with straight-forward abstractions.
-
-\pagebreak
 
 \section{Model\label{model}}
 
 \paragraph {Files.}
 The main concept in MFTP is that of a \emph{file}.
-Files are a sequence of bytes with a length and a user-defined type.
-They are broken down into equally sized pieces called \emph{fragments}.  
-Each file is uniquely identified by its \emph{file ID}, a structure that contains a hash of the file content, the file's length, and the file's type.
-Given two files $f_1$ and $f_2$, one can define a matching predicate $\mu$.
+A file is a sequence of bytes with a length and a user-defined type.
+Files are broken down into pieces of equal size called \emph{fragments}.
+Each file is uniquely identified by a \emph{file ID} that contains the file's type, length, and a hash of the file's content.
+% TODO:  We need to move this.
+% Given two files $f_1$ and $f_2$, one can define a matching predicate $\mu$.
 
 \paragraph{Messages.}
 File transfer takes place via \emph{messages}.
