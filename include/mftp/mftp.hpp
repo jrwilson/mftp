@@ -61,12 +61,16 @@ namespace mftp {
     }
 
     std::string to_string () const {
-      char temp[2 * sizeof (fileid) + 1];
+      char buffer[2 * sizeof (fileid) + 1];
+      char* ptr = buffer;
+      const char* end = ptr + sizeof (buffer);
+
+      ptr += snprintf (ptr, end - ptr, "%08x%08x", type, length);
+      
       for (size_t idx = 0; idx < HASH_SIZE; ++idx) {
-      	sprintf (&temp[2 * idx], "%02x", hash[idx]);
+      	ptr += snprintf (ptr, end - ptr, "%02x", hash[idx]);
       }
-      sprintf (temp + 2 * HASH_SIZE, "%08x%08x", type, length);
-      return std::string (temp, 2 * sizeof (fileid));
+      return std::string (buffer, ptr - buffer);
     }
   };
 
