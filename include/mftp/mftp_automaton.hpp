@@ -39,6 +39,7 @@ namespace mftp {
     static const ioa::time INIT_ANNOUNCEMENT_INTERVAL;
     static const ioa::time MAX_ANNOUNCEMENT_INTERVAL;
     static const ioa::time MATCHING_INTERVAL;
+    static const ioa::time PROGRESS_INTERVAL;
 
     enum send_state_t {
       SEND_READY,
@@ -64,8 +65,10 @@ namespace mftp {
     timer_state_t m_request_timer_state;
     timer_state_t m_announcement_timer_state;
     timer_state_t m_matching_timer_state;
+    timer_state_t m_progress_timer_state;
     ioa::time m_announcement_interval;
     bool m_reported; // True when we have reported a complete download.
+    bool m_progress;
 
     ioa::handle_manager<mftp_sender_automaton> m_sender;
     ioa::handle_manager<mftp_receiver_automaton> m_receiver;
@@ -76,6 +79,7 @@ namespace mftp {
     const bool m_get_matching_files; // Always get matching files.
 
     bool m_suicide_flag;  //Self-destruct when job is done.
+
 
     std::set<fileid> m_pending_matches;
     std::set<fileid> m_matches;
@@ -134,6 +138,18 @@ namespace mftp {
 				   &m_self,
 				   &mftp_automaton::matching_timer_interrupt);
       }
+
+      ioa::automaton_manager<ioa::alarm_automaton>* progress_clock = new ioa::automaton_manager<ioa::alarm_automaton> (this, ioa::make_generator<ioa::alarm_automaton> ());
+      ioa::make_binding_manager (this,
+				 &m_self,
+				 &mftp_automaton::set_progress_timer,
+				 progress_clock,
+				 &ioa::alarm_automaton::set);
+      ioa::make_binding_manager (this,
+				 progress_clock,
+				 &ioa::alarm_automaton::alarm,
+				 &m_self,
+				 &mftp_automaton::progress_timer_interrupt);
       
       schedule ();
     }
@@ -159,6 +175,7 @@ namespace mftp {
       m_matching_timer_state (SET_READY),
       m_announcement_interval (INIT_ANNOUNCEMENT_INTERVAL),
       m_reported (m_file.complete ()),
+      m_progress (false),
       m_sender (sender),
       m_receiver (receiver),
       m_matching (false),
@@ -191,6 +208,7 @@ namespace mftp {
       m_matching_timer_state (SET_READY),
       m_announcement_interval (INIT_ANNOUNCEMENT_INTERVAL),
       m_reported (m_file.complete ()),
+      m_progress (false),
       m_sender (sender),
       m_receiver (receiver),
       m_matching (true),
@@ -236,6 +254,9 @@ namespace mftp {
       }
       if (suicide_precondition ()) {
 	ioa::schedule (&mftp_automaton::suicide);
+      }
+      if (report_progress_precondition ()) {
+	ioa::schedule (&mftp_automaton::report_progress);
       }
     }
 
@@ -300,7 +321,7 @@ namespace mftp {
 	      process_match_candidate (f);
 	    }
 	    else {
-	      // Create an mftp_automaton with MATCHING FALSE to download other file.
+	      // Create an mftp_automaton with MATCHING FALSE and PROGRESS FALSE to download other file.
 	      // Perform matching when the download is complete.
 	      ioa::automaton_manager<mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp_automaton> (this, ioa::make_generator<mftp_automaton> (f, m_sender.get_handle(), m_receiver.get_handle(), true));
 	      
@@ -570,6 +591,42 @@ namespace mftp {
     }
 
     UV_UP_INPUT (mftp_automaton, matching_timer_interrupt);
+
+    bool set_progress_timer_precondition () const {
+      return m_progress_timer_state == SET_READY && m_progress == false && ioa::binding_count (&mftp_automaton::set_progress_timer) != 0;
+    }
+
+    ioa::time set_progress_timer_effect () {
+      m_progress_timer_state = INTERRUPT_WAIT;
+      return PROGRESS_INTERVAL;
+    }
+
+  public:
+    V_UP_OUTPUT (mftp_automaton, set_progress_timer, ioa::time);
+
+  private:
+    void progress_timer_interrupt_effect () {
+      m_progress = true;
+      m_progress_timer_state = SET_READY;
+    }
+
+  public:
+    UV_UP_INPUT (mftp_automaton, progress_timer_interrupt);
+
+  private:
+    bool report_progress_precondition () const {
+      return m_progress;
+    }
+
+    uint32_t report_progress_effect () {
+      m_progress = false;
+      return m_file.get_progress ();
+    }
+
+  public:
+    V_UP_OUTPUT (mftp_automaton, report_progress, uint32_t);
+
+  private:
     
     bool download_complete_precondition () const {
       return m_file.complete () && !m_reported && ioa::binding_count (&mftp_automaton::download_complete) != 0;
@@ -654,6 +711,7 @@ namespace mftp {
   const ioa::time mftp_automaton::INIT_ANNOUNCEMENT_INTERVAL (1, 0); //1 second
   const ioa::time mftp_automaton::MAX_ANNOUNCEMENT_INTERVAL (64, 0); //slightly over 1 minute
   const ioa::time mftp_automaton::MATCHING_INTERVAL (4, 0); //4 seconds
+  const ioa::time mftp_automaton::PROGRESS_INTERVAL (5, 0);
 
 }
 

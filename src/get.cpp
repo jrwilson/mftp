@@ -15,9 +15,12 @@ namespace jam {
   private:
     ioa::handle_manager<mftp_client_automaton> m_self;
     std::set<mftp::fileid> meta_files;
+    std::map<mftp::fileid, ioa::automaton_manager<mftp::mftp_automaton>* > data_files;
     ioa::automaton_manager<mftp::mftp_sender_automaton>* sender;
     ioa::automaton_manager<mftp::mftp_receiver_automaton>* receiver;
     std::string m_filename;
+
+    static const ioa::time PROGRESS_INTERVAL;
 
   public:
     mftp_client_automaton (std::string fname) :
@@ -63,10 +66,16 @@ namespace jam {
       fid.convert_to_host();
       
       ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), sender->get_handle(), receiver->get_handle(), false));
+
+      data_files.insert(std::make_pair(fid, file_home));
       
       ioa::make_binding_manager (this,
 				 file_home, &mftp::mftp_automaton::download_complete,
 				 &m_self, &mftp_client_automaton::file_complete);
+
+      /*ioa::make_binding_manager (this,
+				 file_home, &mftp::mftp_automaton::report_progress,
+				 &m_self, &mftp_client_automaton::update_progress);*/
     }
   
   public:
@@ -85,8 +94,36 @@ namespace jam {
   public:
     V_AP_INPUT (mftp_client_automaton, file_complete, mftp::file);
   
-  };
 
+  private:
+    void progress_update_effect (const uint32_t& have, ioa::aid_t id) {
+      //Move the iterator to the right fileid.
+      std::map<mftp::fileid, ioa::automaton_manager<mftp::mftp_automaton>*>::iterator it;
+      for(it = data_files.begin ();
+	  it->second->get_handle() != id;
+	  ++it) { ;  }
+
+      if (it == data_files.end ()){
+	std::cerr << "OH NOES" << std::endl;
+      }
+
+      mftp::mfileid mid (it->first);
+      std::cout << "Received " << have << " of " << mid.get_fragment_count () << " fragments" << std::endl;
+    }
+    
+  public:
+    V_AP_INPUT (mftp_client_automaton, progress_update, uint32_t);
+    
+  private:
+    bool report_progress_precondition () const {
+      return false; 
+    }
+    
+    void report_progress_effect () {
+      //print progress
+    }
+  };
+  
 }
 
 int main (int argc, char* argv[]) {

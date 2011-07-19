@@ -45,6 +45,7 @@ namespace mftp {
 		      const void* data);
     span_t get_next_range ();
     uint32_t get_random_index () const;
+    uint32_t get_progress () const;
   };
 }
 

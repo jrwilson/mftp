@@ -239,6 +239,10 @@ namespace mftp {
     return rf;  
   }
 
+  uint32_t file::get_progress () const {
+    return m_have_count;
+  }
+
   uint32_t file::offset_to_hash (const uint32_t offset) const {
     return m_mfileid.get_padded_length () + HASH_SIZE * offset / FRAGMENT_SIZE;
   }
