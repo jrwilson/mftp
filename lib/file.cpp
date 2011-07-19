@@ -174,6 +174,10 @@ namespace mftp {
     return m_data;
   }
 
+  uint32_t file::have_count () const {
+    return m_have_count;
+  }
+
   bool file::complete () const {
     return m_valid_count == m_mfileid.get_fragment_count ();
   }
