@@ -95,7 +95,12 @@ namespace mftp {
     m_valid (m_mfileid.get_fragment_count ()),
     m_valid_count (0),
     m_start_idx (0)
-  { }
+  {
+    for (uint32_t idx = 0; idx < m_mfileid.get_fragment_count (); ++idx) {
+      assert (m_have[idx] == false);
+      assert (m_valid[idx] == false);
+    }
+  }
 
   file::file (const file& other) :
     m_mfileid (other.m_mfileid),
@@ -214,11 +219,15 @@ namespace mftp {
     //bring m_start_indx into range
     m_start_idx = m_start_idx % m_mfileid.get_fragment_count();
  
+    size_t loop_counter = 0;
+
     // Move start until we don't have the fragment.
     for (;
-	 m_have[m_start_idx] == true;
-	 m_start_idx = (m_start_idx + 1) % m_mfileid.get_fragment_count ())
+	 m_have[m_start_idx] == true && loop_counter < m_mfileid.get_fragment_count ();
+	 m_start_idx = (m_start_idx + 1) % m_mfileid.get_fragment_count (), loop_counter++)
       ;;
+
+    assert (loop_counter < m_mfileid.get_fragment_count ());
       
     // Move end until we do have a fragment or reach the end.
     uint32_t end_idx;
@@ -241,6 +250,10 @@ namespace mftp {
     uint32_t rf = rand () % m_mfileid.get_fragment_count ();
     for (; !m_have[rf]; rf = (rf + 1) % m_mfileid.get_fragment_count ()) { }
     return rf;  
+  }
+
+  uint32_t file::get_progress () const {
+    return m_have_count;
   }
 
   uint32_t file::offset_to_hash (const uint32_t offset) const {
