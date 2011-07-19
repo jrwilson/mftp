@@ -255,6 +255,9 @@ namespace mftp {
       if (suicide_precondition ()) {
 	ioa::schedule (&mftp_automaton::suicide);
       }
+      if (set_progress_timer_precondition ()){
+	ioa::schedule (&mftp_automaton::set_progress_timer);
+      }
       if (report_progress_precondition ()) {
 	ioa::schedule (&mftp_automaton::report_progress);
       }
@@ -284,6 +287,7 @@ namespace mftp {
 
   private:
     void receive_effect (const ioa::const_shared_ptr<message>& m) {
+      std::cout << __func__ << std::endl;
       switch (m->header.message_type) {
       case FRAGMENT:
 	{
@@ -594,6 +598,8 @@ namespace mftp {
 
     bool set_progress_timer_precondition () const {
       return m_progress_timer_state == SET_READY && m_progress == false && ioa::binding_count (&mftp_automaton::set_progress_timer) != 0;
+      //std::cout << __func__ << " : " << b << std::endl;
+      //return b;
     }
 
     ioa::time set_progress_timer_effect () {
@@ -615,6 +621,7 @@ namespace mftp {
 
   private:
     bool report_progress_precondition () const {
+      //std::cout << __func__ << " : " << m_progress << std::endl;
       return m_progress;
     }
 
@@ -711,7 +718,7 @@ namespace mftp {
   const ioa::time mftp_automaton::INIT_ANNOUNCEMENT_INTERVAL (1, 0); //1 second
   const ioa::time mftp_automaton::MAX_ANNOUNCEMENT_INTERVAL (64, 0); //slightly over 1 minute
   const ioa::time mftp_automaton::MATCHING_INTERVAL (4, 0); //4 seconds
-  const ioa::time mftp_automaton::PROGRESS_INTERVAL (5, 0);
+  const ioa::time mftp_automaton::PROGRESS_INTERVAL (2, 0);
 
 }
 

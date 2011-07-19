@@ -73,9 +73,9 @@ namespace jam {
 				 file_home, &mftp::mftp_automaton::download_complete,
 				 &m_self, &mftp_client_automaton::file_complete);
 
-      /*ioa::make_binding_manager (this,
+      ioa::make_binding_manager (this,
 				 file_home, &mftp::mftp_automaton::report_progress,
-				 &m_self, &mftp_client_automaton::update_progress);*/
+				 &m_self, &mftp_client_automaton::update_progress);
     }
   
   public:
@@ -96,7 +96,7 @@ namespace jam {
   
 
   private:
-    void progress_update_effect (const uint32_t& have, ioa::aid_t id) {
+    void update_progress_effect (const uint32_t& have, ioa::aid_t id) {
       //Move the iterator to the right fileid.
       std::map<mftp::fileid, ioa::automaton_manager<mftp::mftp_automaton>*>::iterator it;
       for(it = data_files.begin ();
@@ -112,7 +112,7 @@ namespace jam {
     }
     
   public:
-    V_AP_INPUT (mftp_client_automaton, progress_update, uint32_t);
+    V_AP_INPUT (mftp_client_automaton, update_progress, uint32_t);
     
   private:
     bool report_progress_precondition () const {
