@@ -13,7 +13,6 @@
 #include <set>
 #include <vector>
 #include <cstring>
-#include <math.h>
 
 // TODO:  We accumulate matches without ever forgetting them.  We should purge matches that we haven't seen in a while.
 
@@ -40,6 +39,7 @@ namespace mftp {
     static const ioa::time MAX_ANNOUNCEMENT_INTERVAL;
     static const ioa::time MATCHING_INTERVAL;
     static const ioa::time PROGRESS_INTERVAL;
+    static const size_t MAX_FRAGMENT_COUNT;
 
     enum send_state_t {
       SEND_READY,
@@ -59,6 +59,7 @@ namespace mftp {
     uint32_t m_requests_count; // Number of true elements in m_requests.
     std::queue<ioa::const_shared_ptr<message_buffer> > m_sendq;
     send_state_t m_send_state;
+    size_t m_fragment_count;
     bool m_send_request;
     bool m_send_announcement;
     bool m_send_match;
@@ -167,6 +168,7 @@ namespace mftp {
       m_requests (m_mfileid.get_fragment_count ()),
       m_requests_count (0),
       m_send_state (SEND_READY),
+      m_fragment_count (0),
       m_send_request (!m_file.complete ()),
       m_send_announcement (!m_file.empty ()),
       m_send_match (false),
@@ -200,6 +202,7 @@ namespace mftp {
       m_requests (m_mfileid.get_fragment_count ()),
       m_requests_count (0),
       m_send_state (SEND_READY),
+      m_fragment_count (0),
       m_send_request (!m_file.complete ()),
       m_send_announcement (!m_file.empty ()),
       m_send_match (false),
@@ -270,6 +273,10 @@ namespace mftp {
     ioa::const_shared_ptr<message_buffer> send_effect () {
       ioa::const_shared_ptr<message_buffer> m = m_sendq.front ();
       m_sendq.pop ();
+      if (m->msg.header.message_type == htonl (FRAGMENT)) {
+	--m_fragment_count;
+      }
+
       m_send_state = SEND_COMPLETE_WAIT;
       return m;
     }
@@ -440,7 +447,7 @@ namespace mftp {
 
   private:
     bool send_fragment_precondition () const {
-      return m_requests_count != 0 && m_sendq.empty ();
+      return m_requests_count != 0 && m_fragment_count < MAX_FRAGMENT_COUNT;
     }
 
     void send_fragment_effect () {
@@ -454,6 +461,7 @@ namespace mftp {
       message_buffer* m = get_fragment (randy);
       m->convert_to_network ();
       m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+      ++m_fragment_count;
     }
 
     UP_INTERNAL (mftp_automaton, send_fragment);
@@ -496,11 +504,15 @@ namespace mftp {
     void send_announcement_effect () {
       assert (!m_file.empty ());
 
-      message_buffer* m = get_fragment (m_file.get_random_index ());
-      m->convert_to_network ();
-      m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
-      if (m_announcement_interval < MAX_ANNOUNCEMENT_INTERVAL) {
-      	m_announcement_interval += m_announcement_interval;
+      // If we have outstanding requests, we don't need to announce.
+      if (m_requests_count == 0 && m_fragment_count < MAX_FRAGMENT_COUNT) {
+	message_buffer* m = get_fragment (m_file.get_random_index ());
+	m->convert_to_network ();
+	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+	if (m_announcement_interval < MAX_ANNOUNCEMENT_INTERVAL) {
+	  m_announcement_interval += m_announcement_interval;
+	}
+	++m_fragment_count;
       }
 
       m_send_announcement = false;
@@ -719,6 +731,7 @@ namespace mftp {
   const ioa::time mftp_automaton::MAX_ANNOUNCEMENT_INTERVAL (64, 0); //slightly over 1 minute
   const ioa::time mftp_automaton::MATCHING_INTERVAL (4, 0); //4 seconds
   const ioa::time mftp_automaton::PROGRESS_INTERVAL (2, 0);
+  const size_t mftp_automaton::MAX_FRAGMENT_COUNT (1); // Number of fragments allowed in sendq.
 
 }
 
