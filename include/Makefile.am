@@ -3,5 +3,4 @@ mftp/file.hpp \
 mftp/mftp.hpp \
 mftp/mftp_automaton.hpp \
 mftp/mftp_sender_automaton.hpp \
-mftp/mftp_receiver_automaton.hpp \
-mftp/sha2_256.hpp
+mftp/mftp_receiver_automaton.hpp
