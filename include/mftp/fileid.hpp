@@ -1,10 +1,14 @@
 #ifndef __fileid_hpp__
 #define __fileid_hpp__
 
-#include <stdint.h>
-#include <cstddef>
-#include <string>
+#include <arpa/inet.h>
+#include <cassert>
 #include <cmath>
+#include <cstddef>
+#include <cstring>
+#include <stdint.h>
+#include <stdio.h>
+#include <string>
 
 namespace mftp {
   const size_t HASH_SIZE = 32;
