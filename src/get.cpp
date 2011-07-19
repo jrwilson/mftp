@@ -97,10 +97,11 @@ namespace jam {
 
   private:
     void update_progress_effect (const uint32_t& have, ioa::aid_t id) {
+      std::cout << __func__ << std::endl;
       //Move the iterator to the right fileid.
       std::map<mftp::fileid, ioa::automaton_manager<mftp::mftp_automaton>*>::iterator it;
       for(it = data_files.begin ();
-	  it->second->get_handle() != id;
+	  it->second->get_handle() != id && it != data_files.end ();
 	  ++it) { ;  }
 
       if (it == data_files.end ()){
