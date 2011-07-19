@@ -1,9 +1,9 @@
 #ifndef __file_hpp__
 #define __file_hpp__
 
-#include <mftp/mftp.hpp>
-
 #include <vector>
+#include <mftp/fileid.hpp>
+#include <mftp/span.hpp>
 
 namespace mftp {
   
@@ -19,8 +19,10 @@ namespace mftp {
 
     uint32_t offset_to_hash (const uint32_t) const;
     uint32_t hash_to_offset (const uint32_t) const;
-    bool get_previous_hash (const uint32_t, unsigned char*) const;
-    bool get_hash (const uint32_t, unsigned char*) const;
+    bool get_previous_hash (const uint32_t,
+			    unsigned char*) const;
+    bool get_hash (const uint32_t,
+		   unsigned char*) const;
     void validate (const uint32_t);
 
   public:
@@ -28,7 +30,9 @@ namespace mftp {
 	  const uint32_t);
     file (const fileid& f);
     file (const file& other);
-    file (const void* ptr, uint32_t size, uint32_t type);
+    file (const void* ptr,
+	  uint32_t size,
+	  uint32_t type);
     ~file ();
     
     const mfileid& get_mfileid () const;

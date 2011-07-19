@@ -2,8 +2,10 @@
 #define __mftp_sender_automaton_hpp__
 
 #include <ioa/udp_sender_automaton.hpp>
+#include <mftp/message.hpp>
 
 #include <queue>
+#include <iostream>
 
 namespace mftp {
 

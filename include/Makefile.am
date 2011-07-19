@@ -1,6 +1,9 @@
 nobase_include_HEADERS = \
 mftp/file.hpp \
+mftp/fileid.hpp \
+mftp/message.hpp \
 mftp/mftp.hpp \
 mftp/mftp_automaton.hpp \
 mftp/mftp_sender_automaton.hpp \
-mftp/mftp_receiver_automaton.hpp
+mftp/mftp_receiver_automaton.hpp \
+mftp/span.hpp

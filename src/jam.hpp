@@ -1,7 +1,7 @@
 #ifndef __jam_hpp__
 #define __jam_hpp__
 
-#include <mftp/mftp_automaton.hpp>
+#include <mftp/mftp.hpp>
 
 namespace jam {
   

@@ -224,12 +224,12 @@ namespace mftp {
       ;;
       
     // Request range [m_start_idx, end_idx).
-    span_t retspan;
-    retspan.start = m_start_idx * FRAGMENT_SIZE;
-    retspan.stop = end_idx * FRAGMENT_SIZE;
+    span_t retval;
+    retval.start = m_start_idx * FRAGMENT_SIZE;
+    retval.stop = end_idx * FRAGMENT_SIZE;
     m_start_idx = end_idx;
 
-    return retspan;
+    return retval;
   }
 
   uint32_t file::get_random_index () const {
