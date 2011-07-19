@@ -1,7 +1,8 @@
-#ifndef __mftp_sender_automaton_hpp__
-#define __mftp_sender_automaton_hpp__
+#ifndef __mftp_channel_automaton_hpp__
+#define __mftp_channel_automaton_hpp__
 
 #include <ioa/udp_sender_automaton.hpp>
+#include <ioa/udp_receiver_automaton.hpp>
 #include <mftp/message.hpp>
 
 #include <queue>
@@ -9,18 +10,19 @@
 
 namespace mftp {
 
-  class mftp_sender_automaton :
+  class mftp_channel_automaton :
     public ioa::automaton,
     private ioa::observer
   {
   private:
-    ioa::handle_manager<mftp_sender_automaton> m_self;
+    ioa::handle_manager<mftp_channel_automaton> m_self;
     typedef std::pair<ioa::const_shared_ptr<message_buffer>, ioa::aid_t> message_aid;
     std::list<message_aid > m_outgoing_messages;
     std::set<ioa::aid_t> m_outgoing_set;
     ioa::aid_t m_pending_aid;
     std::set<ioa::aid_t> m_outgoing_completes;
     const ioa::inet_address m_send;
+    std::queue<ioa::const_shared_ptr<mftp::message> > m_incoming_messages;
 
     struct message_aid_equal {
       const ioa::aid_t m_aid;
@@ -35,7 +37,9 @@ namespace mftp {
     };
 
   public:
-    mftp_sender_automaton (ioa::inet_address send_address) :
+    mftp_channel_automaton (const ioa::inet_address& send_address,
+			    const ioa::inet_address& local_address,
+			    const bool multicast) :
       m_self (ioa::get_aid ()),
       m_pending_aid (-1),
       m_send (send_address)
@@ -46,25 +50,42 @@ namespace mftp {
       ioa::automaton_manager<ioa::udp_sender_automaton>* sender = new ioa::automaton_manager<ioa::udp_sender_automaton> (this, ioa::make_generator<ioa::udp_sender_automaton> (sizeof (message)));
 
       ioa::make_binding_manager (this,
-				 &m_self, &mftp_sender_automaton::send_out,
+				 &m_self, &mftp_channel_automaton::send_out,
 				 sender, &ioa::udp_sender_automaton::send);
 
       ioa::make_binding_manager (this,
 				 sender, &ioa::udp_sender_automaton::send_complete,
-				 &m_self, &mftp_sender_automaton::send_in_complete);
+				 &m_self, &mftp_channel_automaton::send_in_complete);
+
+      ioa::automaton_manager<ioa::udp_receiver_automaton>* receiver;
+      if (multicast) {
+	receiver = new ioa::automaton_manager<ioa::udp_receiver_automaton> (this, ioa::make_generator<ioa::udp_receiver_automaton> (send_address, local_address));
+      }
+      else {
+	receiver = new ioa::automaton_manager<ioa::udp_receiver_automaton> (this, ioa::make_generator<ioa::udp_receiver_automaton> (local_address));
+      }
+
+      ioa::make_binding_manager (this,
+				 receiver, &ioa::udp_receiver_automaton::receive,
+				 &m_self, &mftp_channel_automaton::receive_in);
+
+      schedule ();
     }
 
   private:
     void schedule () const {
       if (send_out_precondition ()) {
-	ioa::schedule (&mftp_sender_automaton::send_out);
+	ioa::schedule (&mftp_channel_automaton::send_out);
       }
       for (std::set<ioa::aid_t>::const_iterator pos = m_outgoing_completes.begin ();
 	   pos != m_outgoing_completes.end ();
 	   ++pos) {
 	if (send_complete_precondition (*pos)) {
-	  ioa::schedule (&mftp_sender_automaton::send_complete, *pos);
+	  ioa::schedule (&mftp_channel_automaton::send_complete, *pos);
 	}
+      }
+      if (receive_precondition ()) {
+	ioa::schedule (&mftp_channel_automaton::receive);
       }
     }
 
@@ -105,11 +126,11 @@ namespace mftp {
     }
 
   public:
-    V_AP_INPUT (mftp_sender_automaton, send, ioa::const_shared_ptr<message_buffer>);
+    V_AP_INPUT (mftp_channel_automaton, send, ioa::const_shared_ptr<message_buffer>);
 
   private:
     bool send_out_precondition () const {
-      return m_pending_aid == -1 && !m_outgoing_messages.empty () && ioa::binding_count (&mftp_sender_automaton::send_out) != 0;
+      return m_pending_aid == -1 && !m_outgoing_messages.empty () && ioa::binding_count (&mftp_channel_automaton::send_out) != 0;
     }
 
     ioa::udp_sender_automaton::send_arg send_out_effect () {
@@ -120,7 +141,7 @@ namespace mftp {
       return ioa::udp_sender_automaton::send_arg (m_send, m.first);
     }
 
-    V_UP_OUTPUT (mftp_sender_automaton, send_out, ioa::udp_sender_automaton::send_arg);
+    V_UP_OUTPUT (mftp_channel_automaton, send_out, ioa::udp_sender_automaton::send_arg);
 
     void send_in_complete_effect (const int& result) {
       if (result != 0) {
@@ -139,11 +160,11 @@ namespace mftp {
       }
     }
 
-    V_UP_INPUT (mftp_sender_automaton, send_in_complete, int);
+    V_UP_INPUT (mftp_channel_automaton, send_in_complete, int);
 
   private:
     bool send_complete_precondition (ioa::aid_t aid) const {
-      return m_outgoing_completes.count (aid) != 0 && ioa::binding_count (&mftp_sender_automaton::send_complete, aid) != 0;
+      return m_outgoing_completes.count (aid) != 0 && ioa::binding_count (&mftp_channel_automaton::send_complete, aid) != 0;
     }
 
     void send_complete_effect (ioa::aid_t aid) {
@@ -151,8 +172,33 @@ namespace mftp {
     }
 
   public:
-    UV_AP_OUTPUT (mftp_sender_automaton, send_complete);
+    UV_AP_OUTPUT (mftp_channel_automaton, send_complete);
 
+  private:
+    void receive_in_effect (const ioa::udp_receiver_automaton::receive_val& rv) {
+      if (rv.buffer.get () != 0 && rv.buffer->size () == sizeof (mftp::message)) {
+	std::auto_ptr<mftp::message> m (new mftp::message);
+	memcpy (m.get (), rv.buffer->data (), rv.buffer->size ());
+	if (m.get ()->convert_to_host ()) {
+	  m_incoming_messages.push (ioa::const_shared_ptr<mftp::message> (m.release ()));
+	}
+      }
+    }
+
+    V_UP_INPUT (mftp_channel_automaton, receive_in, ioa::udp_receiver_automaton::receive_val);
+
+    bool receive_precondition () const {
+      return !m_incoming_messages.empty ()  && ioa::binding_count (&mftp_channel_automaton::receive) != 0;
+    }
+
+    ioa::const_shared_ptr<mftp::message> receive_effect () {
+      ioa::const_shared_ptr<mftp::message> m = m_incoming_messages.front ();
+      m_incoming_messages.pop ();
+      return m;
+    }
+
+  public:
+    V_UP_OUTPUT (mftp_channel_automaton, receive, ioa::const_shared_ptr<mftp::message>);
   };
 
 }

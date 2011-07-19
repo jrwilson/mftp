@@ -15,8 +15,7 @@ namespace jam {
   private:
     ioa::handle_manager<mftp_client_automaton> m_self;
     std::set<mftp::fileid> meta_files;
-    ioa::automaton_manager<mftp::mftp_sender_automaton>* sender;
-    ioa::automaton_manager<mftp::mftp_receiver_automaton>* receiver;
+    ioa::automaton_manager<mftp::mftp_channel_automaton>* channel;
     std::string m_filename;
 
   public:
@@ -24,11 +23,9 @@ namespace jam {
       m_self (ioa::get_aid ()),
       m_filename (fname)
     {
-      sender = new ioa::automaton_manager<mftp::mftp_sender_automaton> (this, ioa::make_generator<mftp::mftp_sender_automaton> (jam::SEND_ADDR));
-      receiver = new ioa::automaton_manager<mftp::mftp_receiver_automaton> (this, ioa::make_generator<mftp::mftp_receiver_automaton> (jam::LOCAL_ADDR, jam::MULTICAST_ADDR));
+      channel = new ioa::automaton_manager<mftp::mftp_channel_automaton> (this, ioa::make_generator<mftp::mftp_channel_automaton> (jam::SEND_ADDR, jam::LOCAL_ADDR, true));
 
-      add_observable (sender);
-      add_observable (receiver);
+      add_observable (channel);
     }
   private:
     void schedule () const { }
@@ -36,19 +33,16 @@ namespace jam {
     void observe (ioa::observable* o) {
       //need to do -1 == sender->get_handle () instead of the normal syntax
       //the other way it gets confused whether to convert -1 to a handle or the get_handle () handle to an int
-      if (o == sender && -1 == sender->get_handle ()) {
-	sender = 0;
-      }
-      else if (o == receiver && -1 == receiver->get_handle()) {
-	receiver = 0;
+      if (o == channel && -1 == channel->get_handle ()) {
+	channel = 0;
       }
 
-      if (sender != 0 && receiver != 0) {
-	if (sender->get_handle () != -1 && receiver->get_handle () != -1) {
+      if (channel != 0) {
+	if (channel->get_handle () != -1) {
 	  mftp::file f (m_filename.c_str (), m_filename.size (), QUERY_TYPE);
 
 	  // Create the query server.
-	  ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, sender->get_handle (), receiver->get_handle (), meta_predicate (), meta_filename_predicate (m_filename), true, false));
+	  ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, channel->get_handle (), meta_predicate (), meta_filename_predicate (m_filename), true, false));
 	  
 	  ioa::make_binding_manager (this,
 				     query, &mftp::mftp_automaton::match_complete,
@@ -62,7 +56,7 @@ namespace jam {
       memcpy (&fid, f->get_data_ptr (), sizeof (mftp::fileid));
       fid.convert_to_host();
       
-      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), sender->get_handle(), receiver->get_handle(), false));
+      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), channel->get_handle(), false));
       
       ioa::make_binding_manager (this,
 				 file_home, &mftp::mftp_automaton::download_complete,
