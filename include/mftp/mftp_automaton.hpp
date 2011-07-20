@@ -56,6 +56,7 @@ namespace mftp {
     const fileid& m_fileid;
     std::vector<bool> m_requests; // Bit vector indicating fragments that have been requested.
     uint32_t m_requests_count; // Number of true elements in m_requests.
+    uint32_t m_last_sent_idx; //Index of last fragment sent
     std::queue<ioa::const_shared_ptr<message_buffer> > m_sendq;
     send_state_t m_send_state;
     size_t m_fragment_count;
@@ -162,6 +163,7 @@ namespace mftp {
       m_fileid (m_mfileid.get_fileid ()),
       m_requests (m_mfileid.get_fragment_count ()),
       m_requests_count (0),
+      m_last_sent_idx (rand () % m_mfileid.get_fragment_count ()),
       m_send_state (SEND_READY),
       m_fragment_count (0),
       m_send_request (!m_file.complete ()),
@@ -195,6 +197,7 @@ namespace mftp {
       m_fileid (m_mfileid.get_fileid ()),
       m_requests (m_mfileid.get_fragment_count ()),
       m_requests_count (0),
+      m_last_sent_idx (rand () % m_mfileid.get_fragment_count ()),
       m_send_state (SEND_READY),
       m_fragment_count (0),
       m_send_request (!m_file.complete ()),
@@ -445,13 +448,13 @@ namespace mftp {
 
     void send_fragment_effect () {
       // Purpose is to produce a randomly selected requested fragment.
-      // Get a random index.
-      uint32_t randy = get_random_request_index ();
-      m_requests[randy] = false;
+      advance_to_next_request_index ();
+      m_requests[m_last_sent_idx] = false;
       --m_requests_count;
       
+      
       // Get the fragment for that index.
-      message_buffer* m = get_fragment (randy);
+      message_buffer* m = get_fragment (m_last_sent_idx);
       m->convert_to_network ();
       m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
       ++m_fragment_count;
@@ -703,11 +706,9 @@ namespace mftp {
     V_UP_OUTPUT (mftp_automaton, match_complete, ioa::const_shared_ptr<file>);
 
   private:
-    uint32_t get_random_request_index () {
+    void advance_to_next_request_index () {
       assert (m_requests_count != 0);
-      uint32_t rf = rand () % m_requests.size();
-      for (; !m_requests[rf]; rf = (rf + 1) % m_requests.size ()) { }
-      return rf;
+      for (; !m_requests[m_last_sent_idx]; m_last_sent_idx = (m_last_sent_idx + 1) % m_requests.size ()) {}
     }
 
     message_buffer* get_fragment (uint32_t idx) {
