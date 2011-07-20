@@ -80,14 +80,28 @@ namespace jam {
       std::string path (m_filename + "-" + f.get_mfileid ().get_fileid ().to_string ());
       // TODO:  Add error checking.
       FILE* fp = fopen (path.c_str (), "w");
-      fwrite (f.get_data_ptr (), 1, f.get_mfileid ().get_original_length (), fp);
-      fclose (fp);
+      if (fp == NULL) {
+	perror ("fopen");
+	exit (EXIT_FAILURE);
+      }
+
+      size_t er = fwrite (f.get_data_ptr (), 1, f.get_mfileid ().get_original_length (), fp);
+      if (er < f.get_mfileid ().get_original_length ()) {
+	std::cerr << "fwrite: couldn't write to " << m_filename << std::endl;
+	exit (EXIT_FAILURE);
+      }
+
+      int err = fclose (fp);
+      if (err != 0) {
+	perror ("fclose");
+	exit (EXIT_FAILURE);
+      }
+      
       std::cout << "Created " << path << std::endl;
     }
   
   public:
     V_AP_INPUT (mftp_client_automaton, file_complete, mftp::file);
-  
 
   private:
     void update_progress_effect (const uint32_t& have, ioa::aid_t id) {
@@ -109,17 +123,8 @@ namespace jam {
     
   public:
     V_AP_INPUT (mftp_client_automaton, update_progress, uint32_t);
-    
-  private:
-    bool report_progress_precondition () const {
-      return false; 
-    }
-    
-    void report_progress_effect () {
-      //print progress
-    }
-  };
-  
+
+  };  
 }
 
 int main (int argc, char* argv[]) {

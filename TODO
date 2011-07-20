@@ -11,3 +11,6 @@ Remove validation from file (making a backup of course) because we assume a trus
 
 * Replace bitsets with interval trees
 This is an optimization to avoid scanning bitsets looking for fragments to request/send.
+
+* Matches
+We accumulate matches without ever forgetting them.  We should purge matches that we haven't seen in a while.
