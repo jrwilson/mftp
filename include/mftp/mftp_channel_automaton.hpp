@@ -5,6 +5,7 @@
 #include <ioa/udp_receiver_automaton.hpp>
 #include <mftp/message.hpp>
 
+#include <config.hpp>
 #include <queue>
 #include <iostream>
 
