@@ -89,6 +89,114 @@ If a relationship is possible, the peer acquires the file and checks $\mu(file_1
 Peers periodically send match messages to indicate which files have a relationship with the file they serve.
 The second way relationships can be learned is by eavesdropping on the match messages sent by other peers.
 
+%%TODO: Talk about validation - possible coinage 'incremental digest'
+
+\paragraph{Matching.}
+Each MFTP automaton contains a flag that determines whether it will perform matching. 
+It has another flag that determines whether it will self-destruct when it has finished downloading its file.
+If the matching flag is set, the automaton applies the matching function $\iota$ to the file IDs of incoming fragments.
+If $\iota$ is true, the automaton recursively constructs another MFTP automaton to download the potential match.
+This child automaton does not perform matching.  
+Its self-destruct flag is set so that it will self-destruct once the potential match has been downloaded.
+When the download is complete, the parent automaton applies the matching function $\mu$ to the file to determine whether it is a match.
+
+\section{Design}
+%% General stuff -- The short argument is we're developing a new protocol
+%% the I/O Automata formal model is good for modeling protocols, therefore we modeled it as an mftp automaton
+%% Diagram with the 3 pieces
+%% Describe the diagram, this is how we're going to do it, this is how we're interfaced and kinda put things together
+%% then go into MFTP Automaton, state, etc
+%% then go on and talk about the actions (send receive etc)
+
+The I/O Automata formal model is a well-established technique for building protocols.
+%% Talk about why I/O Automata is a good method (even though we didn't have a choice)
+I/O Automata model stateful distributed system components that can interact and be composed with each other.
+They change state through transitions classified as input, output or internal actions.
+Input and output actions in different automata are bound; output actions in the one trigger input actions in the other.
+As a result, we present our design of the MFTP protocol as automata.
+
+\begin{figure}
+  \center
+  \includegraphics[scale=0.65]{diagramOne}
+  \caption{Basic implementational view of the protocol \label{DesignOne}}
+\end{figure}
+
+\ref{DesignOne} outlines the necessary pieces which constitute our protocol.
+We define a basic MFTP automaton and a broadcast/multicast channel automaton.
+We define a basic MFTP automaton, a sender, and a receiver.
+The responsibilities of the MFTP automaton are to acquire data and to help others acquire it.
+
+Each MFTP automaton begins with a file, encapsulated in a File object, which is either incomplete or complete.
+If the file is incomplete, the automaton generates requests for the missing fragments.
+If the file is complete, the automaton may serve the file, or it may serve the file while performing matching on it.
+
+MFTP automata receive messages via the receive input action.
+If the input message is a valid fragment of its own file, the automaton saves the fragment.
+If the input message is a request for fragments of its file, it flags those fragments as having been requested.
+If the input message is a match containing its file ID, it records the matching IDs for download.
+
+The automaton holds a queue of one message to send. 
+The internal actions which fill this queue are triggered periodically.
+The automaton generates messages containing one requested fragment if any fragments in the file have been requested.
+The fragment sent is selected at random to help avoid collisions with other MFTP automata serving the same file.
+The automaton generates requests if some fragments in the automaton's own file are missing.
+The automaton generates match messages if it has recorded any matches to its file.
+
+The broadcast/multicast channel automaton uses the UDP sender and receiver built into ioa.
+The channel may be connected to more than one MFTP automaton.
+
+The automaton reports that its file is complete using the download complete output action.
+%%  to multicast messages one at a time.
+%%The receiving automaton uses the ioa UDP receiver.
+
+\section{Implementation}
+%% We implimented our IO Automata design using ioa framework
+%% Interesting techniques - suicide, recursive automata
+
+\section{Evaluation and Discussion\label{evaluation}}
+\paragraph{Jam.} %%needs different header
+Our implementation defines three file types, \emph{data}, \emph{meta} and \emph{query}.  
+A data file contains data from any file in the network.
+A meta file contains as data the file ID of a file in the network and its name. 
+A query file contains only the name of the file which is being queried.
+
+We wrote two programs, \emph{Share} and \emph{Get}, which use MFTP, sender and receiver automata to disseminate a file or files. %%Can one 'disseminate' a file?
+Share creates two MFTP automata, \emph{file server} and \emph{meta server}.
+File server is constructed with a complete file \emph{f}, and meta server is constructed with a meta file.
+The meta file is generated from the fileID and name of f.
+At the start, Get creates one MFTP automaton, \emph{query server}, constructed with a query file.
+The query file is generated from the name of the file to download, supplied by a command line argument.
+
+We defined a functor interface so that Share and Get could use different $\iota$ and $\mu$ functions.
+In Share, meta server performs matching on the meta file and broadcasts matches to f.
+Its $\iota$ returns true if the incoming file is a query file.
+Its $\mu$ returns true if the contents of the downloaded query file match the name of f.
+
+\begin{figure}
+  \center
+  \includegraphics[scale=0.65]{share_diagram}
+  \caption{The share program \label{EvaluationOne}}
+\end{figure}
+
+In Get, query server performs matching on the query file.
+Its $\iota$ returns true if the incoming file is a meta file.
+Its $\mu$ returns true if the contents of the downloaded meta file match the name of the file being queried.
+Query server passes the meta files downloaded by its child automata to Get.
+Using the file IDs contained in the meta files, Get constructs further MFTP automata which download the files pertaining to those file IDs.
+
+\begin{figure}
+  \center
+  \includegraphics[scale=0.65]{get_diagram}
+  \caption{The get program \label{EvalutationTwo}}
+\end{figure}
+
+\section{Related Work}
+
+\section{Conclusion}
+
+\end{document}
+
+
 %% \paragraph {Files.}
 %% The main concept in MFTP is that of a \emph{file}.
 %% A file is a sequence of bytes with a length and a user-defined type.
@@ -143,129 +251,3 @@ The second way relationships can be learned is by eavesdropping on the match mes
 %% Each record is locally controlled
 %% since immutable, can be replicated (no duplicates in the database)
 %% each node has its own set of records which it contributes
-
-\section{Implementation}
-
-%%TODO: Talk about validation
-
-%%TODO: Talk about validation - possible coinage 'incremental digest'
-
-\paragraph{MFTP Automaton.}
-Our implementation of MFTP uses the ioa framework.
-I/O Automata model stateful distributed system components that can interact and be composed with each other.
-They change state through transitions classified as input, output or internal actions.
-Input and output actions in different automata are bound; output actions in the one trigger input actions in the other.
-
-%%Describe our implementation at the 50k ft view and work our way down until things are no longer interesting.
-We define a basic MFTP automaton, a sender, and a receiver.
-The responsibilities of the MFTP automaton are to acquire data and to help others acquire it.
-Each MFTP automaton begins with a file, encapsulated in a File object, which is either incomplete or complete.
-If the file is incomplete, the automaton generates requests for the missing fragments.
-If the file is complete, the automaton may serve the file, or it may serve the file while performing matching on it.
-
-%%Picture of mFTP automaton?
-
-MFTP automata receive messages via the receive input action.
-If the input message is a valid fragment of its own file, the automaton saves the fragment.
-If the input message is a request for fragments of its file, it flags those fragments as having been requested.
-If the input message is a match containing its file ID, it records the matching IDs for download.
-
-The automaton holds a queue of one message to send. 
-The internal actions which fill this queue are triggered periodically.
-The automaton generates messages containing one requested fragment if any fragments in the file have been requested.
-The fragment sent is selected at random to help avoid collisions with other MFTP automata serving the same file.
-The automaton generates requests if some fragments in the automaton's own file are missing.
-The automaton generates match messages if it has recorded any matches to its file.
-
-The automaton reports that its file is complete using the download complete output action.
-
-\paragraph{Matching.}
-Each MFTP automaton contains a flag that determines whether it will perform matching. 
-It has another flag that determines whether it will self-destruct when it has finished downloading its file.
-If the matching flag is set, the automaton applies the matching function $\iota$ to the file IDs of incoming fragments.
-If $\iota$ is true, the automaton recursively constructs another MFTP automaton to download the potential match.
-This child automaton does not perform matching.  
-Its self-destruct flag is set so that it will self-destruct once the potential match has been downloaded.
-When the download is complete, the parent automaton applies the matching function $\mu$ to the file to determine whether it is a match.
-
-\paragraph{Some useful stuff.} %% We know it's rough, but what else can we do?
-The sending automaton uses the UDP sender built into ioa to multicast messages one at a time.
-The receiving automaton uses the ioa UDP receiver.
-The sender and receiver automata may be connected to more than one MFTP automaton.
-
-\vspace{5mm}
-\includegraphics[scale=0.65]{diagramOne}
-
-\paragraph{Jam.} %%needs different header
-Our implementation defines three file types, \emph{data}, \emph{meta} and \emph{query}.  
-A data file contains data from any file in the network.
-A meta file contains as data the file ID of a file in the network and its name. 
-A query file contains only the name of the file which is being queried.
-
-We wrote two programs, \emph{Share} and \emph{Get}, which use MFTP, sender and receiver automata to disseminate a file or files. %%Can one 'disseminate' a file?
-Share creates two MFTP automata, \emph{file server} and \emph{meta server}.
-File server is constructed with a complete file \emph{f}, and meta server is constructed with a meta file.
-The meta file is generated from the fileID and name of f.
-At the start, Get creates one MFTP automaton, \emph{query server}, constructed with a query file.
-The query file is generated from the name of the file to download, supplied by a command line argument.
-
-We defined a functor interface so that Share and Get could use different $\iota$ and $\mu$ functions.
-In Share, meta server performs matching on the meta file and broadcasts matches to f.
-Its $\iota$ returns true if the incoming file is a query file.
-Its $\mu$ returns true if the contents of the downloaded query file match the name of f.
-
-\vspace{2 mm}
-
-\includegraphics[scale=0.55]{share_diagram}
-
-\vspace{2 mm}
-
-In Get, query server performs matching on the query file.
-Its $\iota$ returns true if the incoming file is a meta file.
-Its $\mu$ returns true if the contents of the downloaded meta file match the name of the file being queried.
-Query server passes the meta files downloaded by its child automata to Get.
-Using the file IDs contained in the meta files, Get constructs further MFTP automata which download the files pertaining to those file IDs.
-
-\vspace{2.5 mm}
-
-\includegraphics[scale=0.65]{get_diagram}
-
-\vspace{2 mm}
-
-%%\begin{itemize}
-%%  \item Problem
-%%  \item Design forces
-%%  \item Solution
-%%  \item Consequences
-%%\end{itemize}
-
-\section{Evaluation and Discussion\label{evaluation}}
-
-\begin{itemize}
-\item Translation of automaton in \emph{Distributed Algorithms} to C++.
-\item Simulate a protocol then replace with network components
-\item Compare a protocol using: single-threaded event-based (select loop), multi-threaded, I/O automata
-\item Show a buggy program and then apply an invariant to find the bug.
-\end{itemize}
-
-Bring up style mentioned in section \ref{representation}.
-
-\section{Related Work\label{related_work}}
-
-pthreads (?)
-Edward Lee - The Problem with Threads
-Herb Sutter - The Free Lunch is Over
-Early work on concurrency
-
-\section{Conclusion and Future Work\label{conclusion}}
-
-\begin{itemize}
-  \item We are going to use it to build the substrate.
-  \item Speculate on moving down into operating system (device drivers would be easy, IPC including filesystem replaced by automata)
-  \item Speculate on moving down into the hardware level (Local talent, Ivan Sutherland)
-  \item We can take advantage of multi-core in a very straight-forward way
-  \item New problems in scheduling (Pinning automata to processors to minimize actions that span two processors.  Maximum independent set.)
-  \item We are non-blocking all the way.  Combine this with a deterministic implementation of the scheduler and model and there are serious opportunities for real-time.
-\end{itemize}
-
-\end{document}
