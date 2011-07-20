@@ -46,6 +46,9 @@ namespace mftp {
       INTERRUPT_WAIT,
     };
 
+    #define REQUEST_NUMERATOR 4
+    #define REQUEST_DENOMINATOR 5
+    
     ioa::handle_manager<mftp_automaton> m_self;
     file m_file;
     const mfileid& m_mfileid;
@@ -66,6 +69,8 @@ namespace mftp {
     ioa::time m_announcement_interval;
     bool m_reported; // True when we have reported a complete download.
     bool m_progress;
+    uint32_t m_pending_requests;
+    uint32_t m_since_received;
 
     ioa::handle_manager<mftp_channel_automaton> m_channel;
 
@@ -172,6 +177,8 @@ namespace mftp {
       m_announcement_interval (INIT_ANNOUNCEMENT_INTERVAL),
       m_reported (m_file.complete ()),
       m_progress (false),
+      m_pending_requests (0),
+      m_since_received (0),
       m_channel (channel),
       m_matching (false),
       m_get_matching_files (false),
@@ -206,6 +213,8 @@ namespace mftp {
       m_announcement_interval (INIT_ANNOUNCEMENT_INTERVAL),
       m_reported (m_file.complete ()),
       m_progress (false),
+      m_pending_requests (0),
+      m_since_received (0),
       m_channel (channel),
       m_matching (true),
       m_match_candidate_predicate (match_candidate_pred.clone ()),
@@ -297,7 +306,13 @@ namespace mftp {
 	    
 	    // Save the fragment.
 	    if (!m_file.complete ()){
-	      m_file.write_chunk (m->frag.offset, m->frag.data);
+	      if (m_file.write_chunk (m->frag.offset, m->frag.data)) {
+		++m_since_received;
+		//If we have received more than 80% of the fragments we requested...
+		if (REQUEST_DENOMINATOR * m_since_received > REQUEST_NUMERATOR * m_pending_requests){
+		  m_send_request = true;
+		}
+	      }
 	    }
 	    uint32_t idx = (m->frag.offset / FRAGMENT_SIZE);
 	    if (m_requests[idx]) {
@@ -319,6 +334,7 @@ namespace mftp {
 
 	    file f (m->frag.fid);
 	    f.write_chunk (m->frag.offset, m->frag.data);
+
 	    if (f.complete()) {
 	      // We received the whole file.
 	      process_match_candidate (f);
@@ -468,6 +484,7 @@ namespace mftp {
 	span_t spans[SPANS_SIZE];
 	spans[0] = m_file.get_next_range();
 	uint32_t sp_count = 1;
+	m_pending_requests = (spans[0].stop-spans[0].start) / FRAGMENT_SIZE;
 	bool looking = true;
 	while (looking){
 	  span_t range = m_file.get_next_range ();
@@ -477,12 +494,15 @@ namespace mftp {
 	  else {
 	    spans[sp_count] = range;
 	    ++sp_count;
+	    m_pending_requests += (spans[sp_count].stop - spans[sp_count].start)/FRAGMENT_SIZE;
 	  }
 	}
 	
 	message_buffer* m = new message_buffer (request_type (), m_fileid, sp_count, spans);
 	m->convert_to_network ();
 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+
+	m_since_received = 0;
       }
       m_send_request = false;
     }

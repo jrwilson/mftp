@@ -194,7 +194,7 @@ namespace mftp {
     return m_have[offset / FRAGMENT_SIZE];
   }
 
-  void file::write_chunk (const uint32_t offset,
+  bool file::write_chunk (const uint32_t offset,
 			  const void* data) {
     assert (offset % FRAGMENT_SIZE == 0);
     assert (offset < m_mfileid.get_final_length ());
@@ -207,7 +207,9 @@ namespace mftp {
       m_have[idx] = true;
       ++m_have_count;
       validate (idx);
+      return m_have[idx];
     }
+    return false;
   }
 
   span_t file::get_next_range () {

@@ -42,7 +42,7 @@ namespace mftp {
     bool complete () const;
     bool empty () const;
     bool have (const uint32_t offset) const;
-    void write_chunk (const uint32_t offset,
+    bool write_chunk (const uint32_t offset,
 		      const void* data);
     span_t get_next_range ();
     uint32_t get_random_index () const;
