@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#include <iostream>
+
 namespace mftp {
 
   file::file (const std::string& name,
@@ -95,12 +97,7 @@ namespace mftp {
     m_valid (m_mfileid.get_fragment_count ()),
     m_valid_count (0),
     m_start_idx (0)
-  {
-    for (uint32_t idx = 0; idx < m_mfileid.get_fragment_count (); ++idx) {
-      assert (m_have[idx] == false);
-      assert (m_valid[idx] == false);
-    }
-  }
+  { }
 
   file::file (const file& other) :
     m_mfileid (other.m_mfileid),
@@ -160,7 +157,7 @@ namespace mftp {
 	digester.get (samp);
 	m_mfileid.set_hash (samp);
       }
-    }    
+    }
   }
 
   file::~file () {
@@ -209,7 +206,7 @@ namespace mftp {
       // Now we have it.
       m_have[idx] = true;
       ++m_have_count;
-      validate (offset);
+      validate (idx);
     }
   }
 
@@ -219,15 +216,11 @@ namespace mftp {
     //bring m_start_indx into range
     m_start_idx = m_start_idx % m_mfileid.get_fragment_count();
  
-    size_t loop_counter = 0;
-
     // Move start until we don't have the fragment.
     for (;
-	 m_have[m_start_idx] == true && loop_counter < m_mfileid.get_fragment_count ();
-	 m_start_idx = (m_start_idx + 1) % m_mfileid.get_fragment_count (), loop_counter++)
+	 m_have[m_start_idx] == true;
+	 m_start_idx = (m_start_idx + 1) % m_mfileid.get_fragment_count ())
       ;;
-
-    assert (loop_counter < m_mfileid.get_fragment_count ());
       
     // Move end until we do have a fragment or reach the end.
     uint32_t end_idx;
@@ -256,81 +249,93 @@ namespace mftp {
     return m_have_count;
   }
 
-  uint32_t file::offset_to_hash (const uint32_t offset) const {
-    return m_mfileid.get_padded_length () + HASH_SIZE * offset / FRAGMENT_SIZE;
+  uint32_t file::idx_to_hash (const uint32_t idx) const {
+    return m_mfileid.get_padded_length () + HASH_SIZE * idx;
   }
 
-  uint32_t file::hash_to_offset (const uint32_t hash) const {
-    return (hash - m_mfileid.get_padded_length ()) * FRAGMENT_SIZE / HASH_SIZE;
+  uint32_t file::hash_to_idx (const uint32_t hash) const {
+    return (hash - m_mfileid.get_padded_length ()) / HASH_SIZE;
   }
 
-  bool file::get_previous_hash (const uint32_t offset,
+  bool file::get_previous_hash (const uint32_t idx,
 				unsigned char* hash) const {
-    if (offset == 0) {
+    assert (idx < m_mfileid.get_fragment_count ());
+
+    if (idx == 0) {
       // The digester picks the initial hash.
       return true;
     }
-    else if (offset < (m_mfileid.get_final_length () - FRAGMENT_SIZE)) {
-      return get_hash (offset - FRAGMENT_SIZE, hash);
-    }
-    else if (offset == (m_mfileid.get_final_length () - FRAGMENT_SIZE)) {
+    else if (idx == (m_mfileid.get_fragment_count () - 1)) {
       // We know the penultimate.
       memcpy (hash, m_data + m_mfileid.get_final_length () - HASH_SIZE, HASH_SIZE);
       return true;
     }
-    return false;
+    else {
+      return get_hash (idx - 1, hash);
+    }
   }
   
-  bool file::get_hash (const uint32_t offset,
+  bool file::get_hash (const uint32_t idx,
 		       unsigned char* hash) const {
-    const uint32_t hash_location = offset_to_hash (offset);
+    assert (idx < m_mfileid.get_fragment_count ());
 
-    // Either have it, i.e., it is valid, or comes from the fileid.
-    if (hash_location < m_mfileid.get_final_length () && m_valid[hash_location / FRAGMENT_SIZE]) {
-      memcpy (hash, m_data + hash_location, HASH_SIZE);
-      return true;
-    }
-    else if (hash_location == m_mfileid.get_final_length ()) {
+    const uint32_t hash_location = idx_to_hash (idx);
+
+    if (hash_location == m_mfileid.get_final_length ()) {
+      // It comes from the fileid.
       memcpy (hash, m_mfileid.get_fileid ().hash, HASH_SIZE);
       return true;
     }
+    else if (m_valid[hash_location / FRAGMENT_SIZE]) {
+      // We have it.
+      memcpy (hash, m_data + hash_location, HASH_SIZE);
+      return true;
+    }
     return false;
   }
 
-  void file::validate (const uint32_t offset) {
+  void file::validate (const uint32_t idx) {
+    assert (idx < m_mfileid.get_fragment_count ());
+    assert (m_have[idx]);
+    assert (!m_valid[idx]);
+
     unsigned char previous_hash[HASH_SIZE];
     unsigned char expected_hash[HASH_SIZE];
-    if (get_previous_hash (offset, previous_hash) && get_hash (offset, expected_hash)) {
+
+    if (get_previous_hash (idx, previous_hash) && get_hash (idx, expected_hash)) {
+      const uint32_t offset = idx * FRAGMENT_SIZE;
       sha2_256 digester (offset, previous_hash);
       digester.update (m_data + offset, FRAGMENT_SIZE);
-      if (offset == m_mfileid.get_final_length () - FRAGMENT_SIZE) {
+      if (idx == (m_mfileid.get_fragment_count () - 1)) {
       	digester.finalize ();
       }
       unsigned char hash[HASH_SIZE];
       digester.get (hash);
       if (memcmp (hash, expected_hash, HASH_SIZE) == 0) {
-	// The fragment is valid.
-	m_valid[offset / FRAGMENT_SIZE] = true;
-	++m_valid_count;
+    	// The fragment is valid.
+    	m_valid[idx] = true;
+    	++m_valid_count;
 
-	// Try to validate fragments that depend on this fragment.
-	// We move from the back to the front since the hash moved front to back.
-	// Also, we go one past the end (FRAGMENT_SIZE instead of FRAGMENT_SIZE - 1)
-	// because that fragment might depend on this one.
-	for (int32_t idx = FRAGMENT_SIZE; idx >= 0; idx -= HASH_SIZE) {
-	  const uint32_t hash_location = offset + idx;
+    	// Try to validate fragments that depend on this fragment.
+    	// We move from the back to the front since the hash moved front to back.
+    	// Also, we go one past the end (FRAGMENT_SIZE instead of FRAGMENT_SIZE - 1)
+    	// because that fragment might depend on this one.
+    	for (int32_t off = FRAGMENT_SIZE; off >= static_cast<int32_t>(- HASH_SIZE); off -= HASH_SIZE) {
+	  const uint32_t hash_location = offset + off;
 	  if (hash_location >= m_mfileid.get_padded_length () && hash_location < m_mfileid.get_final_length ()) {
-	    validate (hash_to_offset (hash_location));
+	    const uint32_t dep_idx = hash_to_idx (hash_location);
+	    if (m_have[dep_idx] && !m_valid[dep_idx]) {
+	      validate (dep_idx);
+	    }
 	  }
-	}
+     	}
       }
       else {
-	// The fragment is not valid.
-	// Reset the have bit.
-	m_have[offset / FRAGMENT_SIZE] = false;
-	--m_have_count;
+    	// The fragment is not valid.
+    	// Reset the have bit.
+    	m_have[idx] = false;
+    	--m_have_count;
       }
     }
   }
-
 }

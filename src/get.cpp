@@ -91,7 +91,6 @@ namespace jam {
 
   private:
     void update_progress_effect (const uint32_t& have, ioa::aid_t id) {
-      std::cout << __func__ << std::endl;
       //Move the iterator to the right fileid.
       std::map<mftp::fileid, ioa::automaton_manager<mftp::mftp_automaton>*>::iterator it;
       for(it = data_files.begin ();
@@ -103,7 +102,9 @@ namespace jam {
       }
 
       mftp::mfileid mid (it->first);
-      std::cout << "Received " << have << " of " << mid.get_fragment_count () << " fragments" << std::endl;
+      if (have < mid.get_fragment_count ()) {
+	std::cout << "Received " << have << " of " << mid.get_fragment_count () << " fragments" << std::endl;
+      }
     }
     
   public:

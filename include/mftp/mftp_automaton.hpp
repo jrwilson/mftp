@@ -148,7 +148,6 @@ namespace mftp {
 				 &ioa::alarm_automaton::alarm,
 				 &m_self,
 				 &mftp_automaton::progress_timer_interrupt);
-      
       schedule ();
     }
 
@@ -171,6 +170,7 @@ namespace mftp {
       m_request_timer_state (SET_READY),
       m_announcement_timer_state (SET_READY),
       m_matching_timer_state (SET_READY),
+      m_progress_timer_state (SET_READY),
       m_announcement_interval (INIT_ANNOUNCEMENT_INTERVAL),
       m_reported (m_file.complete ()),
       m_progress (false),
@@ -180,7 +180,6 @@ namespace mftp {
       m_suicide_flag (suicide)
     {
       create_bindings ();
-      std::cout << "Created " << this << std::endl;
     }
 
     // Matching.
@@ -204,6 +203,7 @@ namespace mftp {
       m_request_timer_state (SET_READY),
       m_announcement_timer_state (SET_READY),
       m_matching_timer_state (SET_READY),
+      m_progress_timer_state (SET_READY),
       m_announcement_interval (INIT_ANNOUNCEMENT_INTERVAL),
       m_reported (m_file.complete ()),
       m_progress (false),
@@ -215,7 +215,6 @@ namespace mftp {
       m_suicide_flag (suicide)
     {
       create_bindings ();
-      std::cout << "Created " << this << std::endl;
     }
 
   private:
@@ -604,8 +603,6 @@ namespace mftp {
 
     bool set_progress_timer_precondition () const {
       return m_progress_timer_state == SET_READY && ioa::binding_count (&mftp_automaton::set_progress_timer) != 0;
-      //std::cout << __func__ << " : " << b << std::endl;
-      //return b;
     }
 
     ioa::time set_progress_timer_effect () {
@@ -618,7 +615,7 @@ namespace mftp {
 
   private:
     void progress_timer_interrupt_effect () {
-      std::cout << __func__ << std::endl;
+      assert (m_progress_timer_state == INTERRUPT_WAIT);
       m_progress = true;
       m_progress_timer_state = SET_READY;
     }
@@ -628,12 +625,10 @@ namespace mftp {
 
   private:
     bool report_progress_precondition () const {
-      //std::cout << __func__ << " : " << m_progress << std::endl;
       return m_progress;
     }
 
     uint32_t report_progress_effect () {
-      std::cout << __func__ << std::endl;
       m_progress = false;
       return m_file.get_progress ();
     }
@@ -720,18 +715,13 @@ namespace mftp {
       return new message_buffer (fragment_type (), m_fileid, offset, static_cast<const char*> (m_file.get_data_ptr ()) + offset);
     }
 
-
-    ~mftp_automaton (){
-      std::cout << "destroyed" << this << std::endl;
-    }
-
   };
 
   const ioa::time mftp_automaton::REQUEST_INTERVAL (1, 0); // 1 second
   const ioa::time mftp_automaton::INIT_ANNOUNCEMENT_INTERVAL (1, 0); //1 second
   const ioa::time mftp_automaton::MAX_ANNOUNCEMENT_INTERVAL (64, 0); //slightly over 1 minute
   const ioa::time mftp_automaton::MATCHING_INTERVAL (4, 0); //4 seconds
-  const ioa::time mftp_automaton::PROGRESS_INTERVAL (0,10000); //ms
+  const ioa::time mftp_automaton::PROGRESS_INTERVAL (1,0); //1 second
   const size_t mftp_automaton::MAX_FRAGMENT_COUNT (1); // Number of fragments allowed in sendq.
 
 }
