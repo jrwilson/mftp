@@ -2,7 +2,6 @@
 #define	__mftp_automaton_hpp__
 
 #include <mftp/file.hpp>
-
 #include <mftp/mftp_channel_automaton.hpp>
 #include <ioa/alarm_automaton.hpp>
 
@@ -11,8 +10,6 @@
 #include <set>
 #include <vector>
 #include <cstring>
-
-// TODO:  We accumulate matches without ever forgetting them.  We should purge matches that we haven't seen in a while.
 
 namespace mftp {
   
@@ -670,7 +667,6 @@ namespace mftp {
 					 ioa::aid_t aid) {
       //For use when the child has reported a download_complete.
       process_match_candidate (f);
-      // TODO:  Destroy the mftp_automaton that provided us with the file.
     }
 
     V_AP_INPUT (mftp_automaton, match_download_complete, file);
