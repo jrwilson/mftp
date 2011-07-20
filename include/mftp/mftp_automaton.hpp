@@ -6,7 +6,6 @@
 #include <mftp/mftp_channel_automaton.hpp>
 #include <ioa/alarm_automaton.hpp>
 
-#include <config.hpp>
 #include <cstdlib>
 #include <queue>
 #include <set>
