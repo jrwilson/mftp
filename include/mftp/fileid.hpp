@@ -79,7 +79,10 @@ namespace mftp {
       // LET'S DO MATH!!
 
       // Calculate the size after we pad with 0s to fall on a HASH_SIZE boundary.
-      uint32_t padded_length = m_fileid.length + HASH_SIZE - (m_fileid.length % HASH_SIZE);
+      uint32_t padded_length = m_fileid.length;
+      if (padded_length % HASH_SIZE != 0) {
+	padded_length += (HASH_SIZE - (m_fileid.length % HASH_SIZE));
+      }
       assert ((padded_length % HASH_SIZE) == 0);
 
       /*
@@ -104,10 +107,14 @@ namespace mftp {
       */
 
       m_fragment_count = static_cast<uint32_t> (ceil (static_cast<double> (padded_length) / static_cast<double> (FRAGMENT_SIZE - HASH_SIZE)));
+
       uint32_t hashed_length = padded_length + HASH_SIZE * (m_fragment_count - 1);
       assert ((hashed_length % HASH_SIZE) == 0);
 
-      m_final_length = hashed_length + FRAGMENT_SIZE - (hashed_length % FRAGMENT_SIZE);
+      m_final_length = hashed_length;
+      if (m_final_length % FRAGMENT_SIZE != 0) {
+	m_final_length += (FRAGMENT_SIZE - (hashed_length % FRAGMENT_SIZE));
+      }
       assert ((m_final_length % FRAGMENT_SIZE) == 0);
 
       uint32_t padding = (m_final_length - hashed_length) + (padded_length - m_fileid.length);

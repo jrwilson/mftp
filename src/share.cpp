@@ -13,8 +13,7 @@ namespace jam {
     private ioa::observer
   {
   private:
-    ioa::automaton_manager<mftp::mftp_sender_automaton>* sender;
-    ioa::automaton_manager<mftp::mftp_receiver_automaton>* receiver;
+    ioa::automaton_manager<mftp::mftp_channel_automaton>* channel;
     
     const std::string m_filename;
     const std::string m_sharename;
@@ -29,26 +28,20 @@ namespace jam {
       mftp::fileid copy = file.get_mfileid ().get_fileid ();
       std::cout << "Sharing " << m_filename << " as " << (m_sharename + "-" + copy.to_string ()) << std::endl;
 
-      sender = new ioa::automaton_manager<mftp::mftp_sender_automaton> (this, ioa::make_generator<mftp::mftp_sender_automaton> (jam::SEND_ADDR));
+      channel = new ioa::automaton_manager<mftp::mftp_channel_automaton> (this, ioa::make_generator<mftp::mftp_channel_automaton> (jam::SEND_ADDR, jam::LOCAL_ADDR, true));
       
-      receiver = new ioa::automaton_manager<mftp::mftp_receiver_automaton> (this, ioa::make_generator<mftp::mftp_receiver_automaton> (jam::LOCAL_ADDR, jam::MULTICAST_ADDR));
-
-      add_observable (sender);
-      add_observable (receiver); 
+      add_observable (channel);
     }
 
     void observe (ioa::observable* o) {
-      //need to do -1 == sender->get_handle () instead of the normal syntax
+      //need to do -1 == channel->get_handle () instead of the normal syntax
       //the other way it gets confused whether to convert -1 to a handle or the get_handle () handle to an int
-      if (o == sender && -1 == sender->get_handle ()) {
-	sender = 0;
-      }
-      else if (o == receiver && -1 == receiver->get_handle()) {
-	receiver = 0;
+      if (o == channel && -1 == channel->get_handle ()) {
+	channel = 0;
       }
 
-      if (sender != 0 && receiver != 0) {
-	if (sender->get_handle () != -1 && receiver->get_handle () != -1) {
+      if (channel != 0) {
+	if (channel->get_handle () != -1) {
 	  mftp::file file (m_filename, FILE_TYPE);
 	  mftp::fileid copy = file.get_mfileid ().get_fileid ();
 	  copy.convert_to_network ();
@@ -60,10 +53,10 @@ namespace jam {
 	  mftp::file meta (buff.data (), buff.size (), META_TYPE);
 	
 	  // Create the file server.
-	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, sender->get_handle(), receiver->get_handle(), false));
+	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, channel->get_handle(), false));
 	
 	  // Create the meta server.
-	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, sender->get_handle (), receiver->get_handle (), query_predicate (), query_filename_predicate (m_sharename), false, false));
+	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, channel->get_handle (), query_predicate (), query_filename_predicate (m_sharename), false, false));
 
 	}
       }

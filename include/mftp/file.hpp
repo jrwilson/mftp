@@ -17,8 +17,8 @@ namespace mftp {
     uint32_t m_valid_count;
     uint32_t m_start_idx;
 
-    uint32_t offset_to_hash (const uint32_t) const;
-    uint32_t hash_to_offset (const uint32_t) const;
+    uint32_t idx_to_hash (const uint32_t) const;
+    uint32_t hash_to_idx (const uint32_t) const;
     bool get_previous_hash (const uint32_t,
 			    unsigned char*) const;
     bool get_hash (const uint32_t,
@@ -46,6 +46,7 @@ namespace mftp {
 		      const void* data);
     span_t get_next_range ();
     uint32_t get_random_index () const;
+    uint32_t get_progress () const;
   };
 }
 

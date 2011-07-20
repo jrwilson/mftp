@@ -4,6 +4,5 @@ mftp/fileid.hpp \
 mftp/message.hpp \
 mftp/mftp.hpp \
 mftp/mftp_automaton.hpp \
-mftp/mftp_sender_automaton.hpp \
-mftp/mftp_receiver_automaton.hpp \
+mftp/mftp_channel_automaton.hpp \
 mftp/span.hpp
