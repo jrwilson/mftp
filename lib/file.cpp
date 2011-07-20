@@ -318,9 +318,9 @@ namespace mftp {
 
     	// Try to validate fragments that depend on this fragment.
     	// We move from the back to the front since the hash moved front to back.
-    	// Also, we go one past the end (FRAGMENT_SIZE instead of FRAGMENT_SIZE - 1)
+    	// Also, we go one past the end (FRAGMENT_SIZE instead of FRAGMENT_SIZE - HASH_SIZE)
     	// because that fragment might depend on this one.
-    	for (int32_t off = FRAGMENT_SIZE; off >= static_cast<int32_t>(- HASH_SIZE); off -= HASH_SIZE) {
+    	for (int32_t off = FRAGMENT_SIZE; off >= 0; off -= HASH_SIZE) {
 	  const uint32_t hash_location = offset + off;
 	  if (hash_location >= m_mfileid.get_padded_length () && hash_location < m_mfileid.get_final_length ()) {
 	    const uint32_t dep_idx = hash_to_idx (hash_location);
