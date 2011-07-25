@@ -1,13 +1,5 @@
-* Requests
-Currently we send a request every 4 seconds.
-If we receive all of the fragments we requested in 1 second, then 3 seconds are wasted.
-We need to change the request strategy to ensure a steady stream of fragments.
-
 * TCP
 Study interference with TCP.
-
-* Validation
-Remove validation from file (making a backup of course) because we assume a trusted environment.
 
 * Replace bitsets with interval trees
 This is an optimization to avoid scanning bitsets looking for fragments to request/send.
