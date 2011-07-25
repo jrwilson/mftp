@@ -34,19 +34,16 @@ namespace mftp {
 
     // We have all of the file.
     m_have_count = m_mfileid.get_fragment_count ();
-    m_valid_count = m_mfileid.get_fragment_count ();
     m_have.resize (m_mfileid.get_fragment_count ());
-    m_valid.resize (m_mfileid.get_fragment_count ());
     for (uint32_t idx = 0; idx < m_mfileid.get_fragment_count (); ++idx) {
       m_have[idx] = true;
-      m_valid[idx] = true;
     }
 
     /*
       Layout of the file will be
-      +-------------------------+-------------+---------------------------------+
-      |  DATA (original_length) | 0 (padding) | DIGEST (final_length - padding) |
-      +-------------------------+-------------+---------------------------------+
+      +-------------------------+-------------+
+      |  DATA (original_length) | 0 (padding) |
+      +-------------------------+-------------+
     */
 
     // Allocate storage for the data and read it.
@@ -63,30 +60,11 @@ namespace mftp {
     }
 
     sha2_256 digester;
-
-    uint32_t read_idx;
-    uint32_t write_idx;
-
-    for (read_idx = 0, write_idx = m_mfileid.get_padded_length ();
-	 read_idx < m_mfileid.get_final_length ();
-	 read_idx += FRAGMENT_SIZE, write_idx += HASH_SIZE) {
-      // Update the digest.
-      digester.update (m_data + read_idx, FRAGMENT_SIZE);
-
-      if (write_idx < m_mfileid.get_final_length ()) {
-	// Sample it without finalizing.
-	unsigned char samp[HASH_SIZE];
-	digester.get (samp);
-	memcpy (m_data + write_idx, samp, HASH_SIZE);
-      }
-      else {
-	// Finalize it then sample.
-	digester.finalize ();
-	unsigned char samp[HASH_SIZE];
-	digester.get (samp);
-	m_mfileid.set_hash (samp);
-      }
-    }
+    digester.update (m_data, m_mfileid.get_final_length ());
+    digester.finalize ();
+    unsigned char samp[HASH_SIZE];
+    digester.get (samp);
+    m_mfileid.set_hash (samp);
   }
 
   file::file (const fileid& f) :
@@ -94,8 +72,6 @@ namespace mftp {
     m_data (new unsigned char[m_mfileid.get_final_length ()]),
     m_have (m_mfileid.get_fragment_count ()),
     m_have_count (0),
-    m_valid (m_mfileid.get_fragment_count ()),
-    m_valid_count (0),
     m_start_idx (0)
   { }
 
@@ -103,8 +79,6 @@ namespace mftp {
     m_mfileid (other.m_mfileid),
     m_have (other.m_have),
     m_have_count (other.m_have_count),
-    m_valid (other.m_valid),
-    m_valid_count (other.m_valid_count),
     m_start_idx (0)
   {
     const uint32_t final_length = m_mfileid.get_final_length ();
@@ -117,12 +91,9 @@ namespace mftp {
     m_mfileid.set_length (size);
     m_mfileid.set_type (type);
     m_have_count = m_mfileid.get_fragment_count ();
-    m_valid_count = m_mfileid.get_fragment_count ();
     m_have.resize (m_mfileid.get_fragment_count ());
-    m_valid.resize (m_mfileid.get_fragment_count ());
     for (uint32_t idx = 0; idx < m_mfileid.get_fragment_count (); ++idx) {
       m_have[idx] = true;
-      m_valid[idx] = true;
     }
     
     m_data = new unsigned char[m_mfileid.get_final_length ()];
@@ -134,30 +105,11 @@ namespace mftp {
     }
 
     sha2_256 digester;
-
-    uint32_t read_idx;
-    uint32_t write_idx;
-
-    for (read_idx = 0, write_idx = m_mfileid.get_padded_length ();
-	 read_idx < m_mfileid.get_final_length ();
-	 read_idx += FRAGMENT_SIZE, write_idx += HASH_SIZE) {
-      // Update the digest.
-      digester.update (m_data + read_idx, FRAGMENT_SIZE);
-      
-      if (write_idx < m_mfileid.get_final_length ()) {
-	// Sample it without finalizing.
-	unsigned char samp[HASH_SIZE];
-	digester.get (samp);
-	memcpy (m_data + write_idx, samp, HASH_SIZE);
-      }
-      else {
-	// Finalize it then sample.
-	digester.finalize ();
-	unsigned char samp[HASH_SIZE];
-	digester.get (samp);
-	m_mfileid.set_hash (samp);
-      }
-    }
+    digester.update (m_data, m_mfileid.get_final_length ());
+    digester.finalize ();
+    unsigned char samp[HASH_SIZE];
+    digester.get (samp);
+    m_mfileid.set_hash (samp);
   }
 
   file::~file () {
@@ -181,7 +133,7 @@ namespace mftp {
   }
 
   bool file::complete () const {
-    return m_valid_count == m_mfileid.get_fragment_count ();
+    return m_have_count == m_mfileid.get_fragment_count ();
   }
 
   bool file::empty () const {
@@ -206,7 +158,6 @@ namespace mftp {
       // Now we have it.
       m_have[idx] = true;
       ++m_have_count;
-      validate (idx);
       return m_have[idx];
     }
     return false;
@@ -249,95 +200,5 @@ namespace mftp {
 
   uint32_t file::get_progress () const {
     return m_have_count;
-  }
-
-  uint32_t file::idx_to_hash (const uint32_t idx) const {
-    return m_mfileid.get_padded_length () + HASH_SIZE * idx;
-  }
-
-  uint32_t file::hash_to_idx (const uint32_t hash) const {
-    return (hash - m_mfileid.get_padded_length ()) / HASH_SIZE;
-  }
-
-  bool file::get_previous_hash (const uint32_t idx,
-				unsigned char* hash) const {
-    assert (idx < m_mfileid.get_fragment_count ());
-
-    if (idx == 0) {
-      // The digester picks the initial hash.
-      return true;
-    }
-    else if (idx == (m_mfileid.get_fragment_count () - 1)) {
-      // We know the penultimate.
-      memcpy (hash, m_data + m_mfileid.get_final_length () - HASH_SIZE, HASH_SIZE);
-      return true;
-    }
-    else {
-      return get_hash (idx - 1, hash);
-    }
-  }
-  
-  bool file::get_hash (const uint32_t idx,
-		       unsigned char* hash) const {
-    assert (idx < m_mfileid.get_fragment_count ());
-
-    const uint32_t hash_location = idx_to_hash (idx);
-
-    if (hash_location == m_mfileid.get_final_length ()) {
-      // It comes from the fileid.
-      memcpy (hash, m_mfileid.get_fileid ().hash, HASH_SIZE);
-      return true;
-    }
-    else if (m_valid[hash_location / FRAGMENT_SIZE]) {
-      // We have it.
-      memcpy (hash, m_data + hash_location, HASH_SIZE);
-      return true;
-    }
-    return false;
-  }
-
-  void file::validate (const uint32_t idx) {
-    assert (idx < m_mfileid.get_fragment_count ());
-    assert (m_have[idx]);
-    assert (!m_valid[idx]);
-
-    unsigned char previous_hash[HASH_SIZE];
-    unsigned char expected_hash[HASH_SIZE];
-
-    if (get_previous_hash (idx, previous_hash) && get_hash (idx, expected_hash)) {
-      const uint32_t offset = idx * FRAGMENT_SIZE;
-      sha2_256 digester (offset, previous_hash);
-      digester.update (m_data + offset, FRAGMENT_SIZE);
-      if (idx == (m_mfileid.get_fragment_count () - 1)) {
-      	digester.finalize ();
-      }
-      unsigned char hash[HASH_SIZE];
-      digester.get (hash);
-      if (memcmp (hash, expected_hash, HASH_SIZE) == 0) {
-    	// The fragment is valid.
-    	m_valid[idx] = true;
-    	++m_valid_count;
-
-    	// Try to validate fragments that depend on this fragment.
-    	// We move from the back to the front since the hash moved front to back.
-    	// Also, we go one past the end (FRAGMENT_SIZE instead of FRAGMENT_SIZE - HASH_SIZE)
-    	// because that fragment might depend on this one.
-    	for (int32_t off = FRAGMENT_SIZE; off >= 0; off -= HASH_SIZE) {
-	  const uint32_t hash_location = offset + off;
-	  if (hash_location >= m_mfileid.get_padded_length () && hash_location < m_mfileid.get_final_length ()) {
-	    const uint32_t dep_idx = hash_to_idx (hash_location);
-	    if (m_have[dep_idx] && !m_valid[dep_idx]) {
-	      validate (dep_idx);
-	    }
-	  }
-     	}
-      }
-      else {
-    	// The fragment is not valid.
-    	// Reset the have bit.
-    	m_have[idx] = false;
-    	--m_have_count;
-      }
-    }
   }
 }
