@@ -19,6 +19,8 @@ namespace jam {
     std::map<mftp::fileid, ioa::automaton_manager<mftp::mftp_automaton>* > data_files;
     std::string m_filename;
 
+    ioa::time m_transfer;
+
     static const ioa::time PROGRESS_INTERVAL;
 
   public:
@@ -70,6 +72,8 @@ namespace jam {
       ioa::make_binding_manager (this,
 				 file_home, &mftp::mftp_automaton::report_progress,
 				 &m_self, &mftp_client_automaton::update_progress);
+
+      m_transfer = ioa::time::now ();
     }
   
   public:
@@ -95,6 +99,26 @@ namespace jam {
       if (err != 0) {
 	perror ("fclose");
 	exit (EXIT_FAILURE);
+      }
+      
+      ioa::time t = ioa::time::now () - m_transfer;
+      double num_bytes = double (f.get_mfileid ().get_original_length ());
+      double time = double (t.sec ()) + double(t.usec ())/1000000.0;
+      double rate = num_bytes / time;
+      if(num_bytes > 1024) {
+	num_bytes /= 1024.0;
+	rate /= 1024.0;
+	if(num_bytes > 1024) {
+	  num_bytes /= 1024.0;
+	  rate /= 1024.0;
+	  std::cout << num_bytes << " MB in " << time << " seconds (" << rate << " MB per second)." << std::endl;
+	}
+	else {
+	  std::cout << num_bytes << " KB in " << time << " seconds (" << rate << " KB per second)." << std::endl;
+	}
+      }
+      else {
+	std::cout << num_bytes << " Bytes in " << time << " seconds (" << rate << " Bytes per second)." << std::endl;
       }
       
       std::cout << "Created " << path << std::endl;

@@ -43,5 +43,6 @@ AC_CHECK_FUNCS([gettimeofday memset select socket strerror])
 AC_CONFIG_FILES([Makefile
 		 include/Makefile
 		 lib/Makefile
-		 src/Makefile])
+		 src/Makefile
+		 test/Makefile])
 AC_OUTPUT

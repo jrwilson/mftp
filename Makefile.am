@@ -3,4 +3,5 @@ SUBDIRS = \
 include \
 lib \
 src \
-.
+. \
+test
