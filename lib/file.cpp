@@ -34,10 +34,6 @@ namespace mftp {
 
     // We have all of the file.
     m_have_count = m_mfileid.get_fragment_count ();
-    m_have.resize (m_mfileid.get_fragment_count ());
-    for (uint32_t idx = 0; idx < m_mfileid.get_fragment_count (); ++idx) {
-      m_have[idx] = true;
-    }
 
     /*
       Layout of the file will be
@@ -70,14 +66,15 @@ namespace mftp {
   file::file (const fileid& f) :
     m_mfileid (f),
     m_data (new unsigned char[m_mfileid.get_final_length ()]),
-    m_have (m_mfileid.get_fragment_count ()),
     m_have_count (0),
     m_start_idx (0)
-  { }
+  { 
+    m_dont_have.insert (std::make_pair (0, m_mfileid.get_fragment_count ()));
+  }
 
   file::file (const file& other) :
+    m_dont_have (other.m_dont_have),
     m_mfileid (other.m_mfileid),
-    m_have (other.m_have),
     m_have_count (other.m_have_count),
     m_start_idx (0)
   {
@@ -86,15 +83,12 @@ namespace mftp {
     memcpy (m_data, other.m_data, final_length);
   }
 
-  file::file (const void* ptr, uint32_t size, uint32_t type)
+  file::file (const void* ptr, uint32_t size, uint32_t type) :
+    m_start_idx (0)
   {
     m_mfileid.set_length (size);
     m_mfileid.set_type (type);
     m_have_count = m_mfileid.get_fragment_count ();
-    m_have.resize (m_mfileid.get_fragment_count ());
-    for (uint32_t idx = 0; idx < m_mfileid.get_fragment_count (); ++idx) {
-      m_have[idx] = true;
-    }
     
     m_data = new unsigned char[m_mfileid.get_final_length ()];
     memcpy (m_data, ptr, size);
@@ -140,11 +134,18 @@ namespace mftp {
     return m_have_count == 0;
   }
 
-  bool file::have (const uint32_t offset) const {
-    assert (offset % FRAGMENT_SIZE == 0);
-    assert (offset < m_mfileid.get_final_length ());
-    return m_have[offset / FRAGMENT_SIZE];
-  }
+  // bool file::have (const uint32_t offset) const {
+  //   assert (offset % FRAGMENT_SIZE == 0);
+  //   assert (offset < m_mfileid.get_final_length ());
+  //   const uint32_t idx = offset / FRAGMENT_SIZE;
+  //   interval_set<uint32_t>::const_iterator pos = m_dont_have.lower_bound (std::make_pair (idx, idx + 1));
+  //   if (pos != m_dont_have.end () && pos->first <= offset) {
+  //     return false;
+  //   }
+  //   else {
+  //     return true;
+  //   }
+  // }
 
   bool file::write_chunk (const uint32_t offset,
 			  const void* data) {
@@ -152,49 +153,50 @@ namespace mftp {
     assert (offset < m_mfileid.get_final_length ());
 
     const uint32_t idx = offset / FRAGMENT_SIZE;
-    if (!m_have[idx]) {
+    interval_set<uint32_t>::const_iterator pos = m_dont_have.lower_bound (std::make_pair (idx, idx + 1));
+    if (pos != m_dont_have.end () && pos->first <= idx) {
+      // Don't have.
       // Copy it.
       memcpy (m_data + offset, data, FRAGMENT_SIZE);
       // Now we have it.
-      m_have[idx] = true;
+      m_dont_have.erase (std::make_pair (idx, idx + 1));
       ++m_have_count;
-      return m_have[idx];
+      return true;
     }
-    return false;
+    else {
+      // Have.
+      return false;
+    }
   }
 
   span_t file::get_next_range () {
     // We shouldn't have all the fragments.
     assert (m_have_count != m_mfileid.get_fragment_count ());
-    //bring m_start_indx into range
-    m_start_idx = m_start_idx % m_mfileid.get_fragment_count();
- 
-    // Move start until we don't have the fragment.
-    for (;
-	 m_have[m_start_idx] == true;
-	 m_start_idx = (m_start_idx + 1) % m_mfileid.get_fragment_count ())
-      ;;
-      
-    // Move end until we do have a fragment or reach the end.
-    uint32_t end_idx;
-    for (end_idx = m_start_idx + 1;
-	 end_idx < m_mfileid.get_fragment_count () && m_have[end_idx] == false;
-	 ++end_idx)
-      ;;
+
+    interval_set<uint32_t>::iterator pos = m_dont_have.lower_bound (std::make_pair (m_start_idx, m_start_idx + 1));
+
+    if (pos == m_dont_have.end ()) {
+      pos = m_dont_have.begin ();
+    }
       
     // Request range [m_start_idx, end_idx).
     span_t retval;
-    retval.start = m_start_idx * FRAGMENT_SIZE;
-    retval.stop = end_idx * FRAGMENT_SIZE;
-    m_start_idx = end_idx;
+    retval.start = pos->first * FRAGMENT_SIZE;
+    retval.stop = pos->second * FRAGMENT_SIZE;
+    m_start_idx = pos->second;
 
     return retval;
   }
 
   uint32_t file::get_random_index () const {
     assert (m_have_count != 0);
-    uint32_t rf = rand () % m_mfileid.get_fragment_count ();
-    for (; !m_have[rf]; rf = (rf + 1) % m_mfileid.get_fragment_count ()) { }
+
+    uint32_t rf = 0;
+    for (interval_set<uint32_t>::const_iterator pos = m_dont_have.begin ();
+	 pos != m_dont_have.end () && pos->first == rf;
+	 ++pos, rf = pos->second)
+      ;;
+
     return rf;  
   }
 

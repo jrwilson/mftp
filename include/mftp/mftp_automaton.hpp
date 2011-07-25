@@ -349,6 +349,7 @@ namespace mftp {
 	{
 	  //Requests must be for our file.
 	  if (m->req.fid == m_fileid){
+	    interval_set<uint32_t> requests;
 	    for (uint32_t sp = 0; sp < m->req.span_count; sp++){
 	      // Request must be in range.
 	      if (m->req.spans[sp].start % FRAGMENT_SIZE == 0 &&
@@ -356,16 +357,22 @@ namespace mftp {
 		  m->req.spans[sp].start < m->req.spans[sp].stop &&
 		  m->req.spans[sp].stop <= m_mfileid.get_final_length ()) {
 		// We have it.
-		for (uint32_t offset = m->req.spans[sp].start;
-		     offset < m->req.spans[sp].stop;
-		     offset += FRAGMENT_SIZE) {
-		  uint32_t idx = offset / FRAGMENT_SIZE;
-		  if (m_file.have (offset)) {
-		    // TODO:  This can be more efficient.
-		    m_requests.insert (std::make_pair (idx, idx + 1));
-		  }
-		}
+		requests.insert (std::make_pair (m->req.spans[sp].start / FRAGMENT_SIZE, m->req.spans[sp].stop / FRAGMENT_SIZE));
 	      }
+	    }
+	    if (!requests.empty () && !m_file.m_dont_have.empty ()) {
+	      interval_set<uint32_t>::iterator req_pos = requests.begin ();
+	      const uint32_t req_limit = (--requests.end ())->second;
+	      interval_set<uint32_t>::iterator dh_pos = m_file.m_dont_have.lower_bound (std::make_pair (req_pos->first, req_pos->first + 1));
+	      if (dh_pos != m_file.m_dont_have.begin ()) {
+		--dh_pos;
+	      }
+	      for (; dh_pos != m_file.m_dont_have.end () && dh_pos->first < req_limit; ++dh_pos) {
+		requests.erase (*dh_pos);
+	      }
+	    }
+	    for (interval_set<uint32_t>::const_iterator pos = requests.begin (); pos != requests.end (); ++pos) {
+	      m_requests.insert (*pos);
 	    }
 	  }
 	}

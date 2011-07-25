@@ -1,17 +1,19 @@
 #ifndef __file_hpp__
 #define __file_hpp__
 
-#include <vector>
+#include <mftp/interval_set.hpp>
 #include <mftp/fileid.hpp>
 #include <mftp/span.hpp>
 
 namespace mftp {
   
   class file {
+  public:
+    interval_set<uint32_t> m_dont_have;
+
   private:
     mfileid m_mfileid;
     uint8_t* m_data;
-    std::vector<bool> m_have;
     uint32_t m_have_count;
     uint32_t m_start_idx;
 
@@ -31,7 +33,6 @@ namespace mftp {
     uint32_t have_count () const;
     bool complete () const;
     bool empty () const;
-    bool have (const uint32_t offset) const;
     bool write_chunk (const uint32_t offset,
 		      const void* data);
     span_t get_next_range ();
