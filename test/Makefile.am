@@ -6,4 +6,4 @@ TESTS = interval_set
 
 check_PROGRAMS = $(TESTS)
 
-interval_set_SOURCES = minunit.h interval_set.hpp interval_set.cpp
+interval_set_SOURCES = minunit.h interval_set.cpp

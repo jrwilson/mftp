@@ -4,11 +4,11 @@
 #include <mftp/file.hpp>
 #include <mftp/mftp_channel_automaton.hpp>
 #include <ioa/alarm_automaton.hpp>
+#include <mftp/interval_set.hpp>
 
 #include <cstdlib>
 #include <queue>
 #include <set>
-#include <vector>
 #include <cstring>
 
 namespace mftp {
@@ -53,8 +53,7 @@ namespace mftp {
     file m_file;
     const mfileid& m_mfileid;
     const fileid& m_fileid;
-    std::vector<bool> m_requests; // Bit vector indicating fragments that have been requested.
-    uint32_t m_requests_count; // Number of true elements in m_requests.
+    interval_set<uint32_t> m_requests; // Set of intervals indicating fragments that have been requested.
     uint32_t m_last_sent_idx; //Index of last fragment sent
     std::queue<ioa::const_shared_ptr<message_buffer> > m_sendq;
     send_state_t m_send_state;
@@ -162,8 +161,6 @@ namespace mftp {
       m_file (file),
       m_mfileid (file.get_mfileid ()),
       m_fileid (m_mfileid.get_fileid ()),
-      m_requests (m_mfileid.get_fragment_count ()),
-      m_requests_count (0),
       m_last_sent_idx (rand () % m_mfileid.get_fragment_count ()),
       m_send_state (SEND_READY),
       m_fragment_count (0),
@@ -198,8 +195,6 @@ namespace mftp {
       m_file (file),
       m_mfileid (file.get_mfileid ()),
       m_fileid (m_mfileid.get_fileid ()),
-      m_requests (m_mfileid.get_fragment_count ()),
-      m_requests_count (0),
       m_last_sent_idx (rand () % m_mfileid.get_fragment_count ()),
       m_send_state (SEND_READY),
       m_fragment_count (0),
@@ -314,12 +309,10 @@ namespace mftp {
 		}
 	      }
 	    }
+
+	    // Remove fragment from requests.
 	    uint32_t idx = (m->frag.offset / FRAGMENT_SIZE);
-	    if (m_requests[idx]) {
-	      // Somebody else wanted it and now has just seen it.
-	      m_requests[idx] = false;
-	      --m_requests_count;
-	    }
+	    m_requests.erase (std::make_pair (idx, idx + 1));
 	  }
 
 	  // Otherwise, we could be looking for files that might match our file.
@@ -367,9 +360,9 @@ namespace mftp {
 		     offset < m->req.spans[sp].stop;
 		     offset += FRAGMENT_SIZE) {
 		  uint32_t idx = offset / FRAGMENT_SIZE;
-		  if (m_file.have (offset) && !m_requests[idx]) {
-		    m_requests[idx] = true;
-		    ++m_requests_count;
+		  if (m_file.have (offset)) {
+		    // TODO:  This can be more efficient.
+		    m_requests.insert (std::make_pair (idx, idx + 1));
 		  }
 		}
 	      }
@@ -455,15 +448,13 @@ namespace mftp {
 
   private:
     bool send_fragment_precondition () const {
-      return m_requests_count != 0 && m_fragment_count < MAX_FRAGMENT_COUNT;
+      return !m_requests.empty () && m_fragment_count < MAX_FRAGMENT_COUNT;
     }
 
     void send_fragment_effect () {
       // Purpose is to produce a randomly selected requested fragment.
       advance_to_next_request_index ();
-      m_requests[m_last_sent_idx] = false;
-      --m_requests_count;
-      
+      m_requests.erase (std::make_pair (m_last_sent_idx, m_last_sent_idx + 1));
       
       // Get the fragment for that index.
       message_buffer* m = get_fragment (m_last_sent_idx);
@@ -517,7 +508,7 @@ namespace mftp {
       assert (!m_file.empty ());
 
       // If we have outstanding requests, we don't need to announce.
-      if (m_requests_count == 0 && m_fragment_count < MAX_FRAGMENT_COUNT) {
+      if (m_requests.empty () && m_fragment_count < MAX_FRAGMENT_COUNT) {
 	message_buffer* m = get_fragment (m_file.get_random_index ());
 	m->convert_to_network ();
 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
@@ -722,8 +713,15 @@ namespace mftp {
 
   private:
     void advance_to_next_request_index () {
-      assert (m_requests_count != 0);
-      for (; !m_requests[m_last_sent_idx]; m_last_sent_idx = (m_last_sent_idx + 1) % m_requests.size ()) {}
+      assert (!m_requests.empty ());
+      
+      interval_set<uint32_t>::const_iterator pos = m_requests.lower_bound (std::make_pair (m_last_sent_idx, m_last_sent_idx + 1));
+      if (pos == m_requests.end ()) {
+	// Start over.
+	pos = m_requests.begin ();
+      }
+
+      m_last_sent_idx = pos->first;
     }
 
     message_buffer* get_fragment (uint32_t idx) {
