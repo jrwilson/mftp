@@ -1,4 +1,4 @@
-#include "jam.hpp"
+#include "dd.hpp"
 #include <ioa/global_fifo_scheduler.hpp>
 #include <ioa/ioa.hpp>
 
@@ -6,80 +6,59 @@
 #include <stdio.h>
 #include <string>
 
-namespace jam {
-  
-  class mftp_server_automaton :
+namespace dd {
+
+  class desc_automaton :
     public ioa::automaton,
-    private ioa::observer
+    public ioa::observer
+
   {
   private:
-    ioa::automaton_manager<mftp::mftp_channel_automaton>* channel;
-    
+    ioa::automaton_manager<mftp::mftp_channel_automaton> * channel;
+
     const std::string m_filename;
-    const std::string m_sharename;
 
   public:
-    mftp_server_automaton (const std::string& fname,
-			   const std::string& sname):
-      m_filename (fname),
-      m_sharename (sname)
+    desc_automaton (const std::string& fname) :
+      m_filename (fname)
     {
-      mftp::file file (m_filename, FILE_TYPE);
-      mftp::fileid copy = file.get_mfileid ().get_fileid ();
-      std::cout << "Sharing " << m_filename << " as " << (m_sharename + "-" + copy.to_string ()) << std::endl;
+      mftp::file file (m_filename, DESCRIPTION);
+      std::cout << "Sharing " << m_filename << std::endl;
 
-      channel = new ioa::automaton_manager<mftp::mftp_channel_automaton> (this, ioa::make_generator<mftp::mftp_channel_automaton> (jam::SEND_ADDR, jam::LOCAL_ADDR, true));
-      
+      channel = new ioa::automaton_manager<mftp::mftp_channel_automaton> (this, ioa::make_generator<mftp::mftp_channel_automaton> (dd::SEND_ADDR, dd::LOCAL_ADDR, true));
+
       add_observable (channel);
     }
 
     void observe (ioa::observable* o) {
-      //need to do -1 == channel->get_handle () instead of the normal syntax
-      //the other way it gets confused whether to convert -1 to a handle or the get_handle () handle to an int
       if (o == channel && -1 == channel->get_handle ()) {
 	channel = 0;
       }
 
       if (channel != 0) {
 	if (channel->get_handle () != -1) {
-	  mftp::file file (m_filename, FILE_TYPE);
-	  mftp::fileid copy = file.get_mfileid ().get_fileid ();
-	  copy.convert_to_network ();
+	  mftp::file file (m_filename, DESCRIPTION);
 
-	  ioa::buffer buff;
-	  buff.append (&copy, sizeof (mftp::fileid));
-	  buff.append (m_sharename.c_str (), m_sharename.size ());
-
-	  mftp::file meta (buff.data (), buff.size (), META_TYPE);
-	
-	  // Create the file server.
-	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, channel->get_handle(), false));
-	
-	  // Create the meta server.
-	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, channel->get_handle (), query_predicate (), query_filename_predicate (m_sharename), false, false));
-
+	  std::string desc_string (static_cast<const char*> (file.get_data_ptr ()), file.get_mfileid ().get_original_length ());
+	  std::cout << "description: \n" << desc_string << std::endl;
+	  //Create the description server.
+	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, channel->get_handle (), specification_predicate (), full_specification_predicate (desc_string), false, false));
 	}
       }
     }
 
   };
-
 }
 
 int main (int argc, char* argv[]) {
-  if (!(argc == 2 || argc == 3)) {
-    std::cerr << "Usage: " << argv[0] << " FILE [NAME]" << std::endl;
+  if (argc != 2) {
+    std::cerr << "Usage: " << argv[0] << " FILE " << std::endl;
     exit(EXIT_FAILURE);
   }
 
-  const char* real_path = argv[1];
-  char* shared_as = argv[1];
-  if (argc == 3) {
-    shared_as = argv[2];
-  }
-
+  const char* path = argv[1];
   ioa::global_fifo_scheduler sched;
-  ioa::run (sched, ioa::make_generator<jam::mftp_server_automaton> (real_path, shared_as));
+  ioa::run (sched, ioa::make_generator<dd::desc_automaton> (path));
 
   return 0;
 }

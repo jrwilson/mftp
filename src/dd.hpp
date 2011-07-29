@@ -37,15 +37,18 @@ namespace dd {
 
     bool operator() (const mftp::file& f) const {
       assert (f.get_mfileid ().get_fileid ().type == DESCRIPTION);
-      std::string description (f.get_data_ptr (), f.get_mfileid ().get_original_length ());
+      std::string description (static_cast<const char*> (f.get_data_ptr ()), f.get_mfileid ().get_original_length ());
+      std::cout << "full desc checking \n" << description << std::endl;
       if (description.find (specification) != std::string::npos) {
+	std::cout << "full desc returning true" << std::endl;
 	return true;
       }
+      std::cout << "full desc returning false" << std::endl;
       return false;
     }
 
-    description_filename_predicate* clone () const {
-      return new description_filename_predicate (*this);
+    full_description_predicate* clone () const {
+      return new full_description_predicate (*this);
     }
 
   };
@@ -73,10 +76,17 @@ namespace dd {
 
     bool operator() (const mftp::file& f) const {
       assert (f.get_mfileid ().get_fileid ().type == SPECIFICATION);
-      std::string specification (f.get_data_ptr (), f.get_mfileid ().get_original_length ());
+      std::string specification (static_cast<const char*> (f.get_data_ptr ()), f.get_mfileid ().get_original_length ());
+      std::cout << "full spec checking for " << specification << " in " << description << std::endl;
+      std::cout << "spec length: " << specification.length () << std::endl;
+      std::cout << "desc length: " << description.length () << std::endl;
+      //std::cout << "string::npos is " << std::string::npos << std::endl;
+      //std::cout << "Find returns " << description.find (specification) << std::endl;
       if (description.find (specification) != std::string::npos) {
+	std::cout << "full spec returning true" << std::endl;
 	return true;
       }
+      std::cout << "full spec returning false" << std::endl;
       return false;
     }
 
