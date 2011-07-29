@@ -1,3 +1,6 @@
+* Files
+Work with const shared pointers to files rather than files to eliminate copy time at the end of the transfer.
+
 * TCP
 Study interference with TCP.
 
