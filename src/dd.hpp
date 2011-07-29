@@ -29,19 +29,17 @@ namespace dd {
   struct full_description_predicate :
     public mftp::match_predicate
   {
-    std::string spec;
+    std::string specification;
     
-    description_filename_predicate (const std::string& sp) :
-      spec (sp)
+    full_description_predicate (const std::string& spec) :
+      specification (spec)
     { }
 
     bool operator() (const mftp::file& f) const {
       assert (f.get_mfileid ().get_fileid ().type == DESCRIPTION);
-      if (f.get_mfileid ().get_original_length () >= strlen (spec)) {
-	// We have enough data.
-	std::string data;
-	sprintf (
-	return memcmp (filename.c_str (), static_cast<const char*> (f.get_data_ptr ()) + sizeof (mftp::fileid), std::min (filename.size (), size)) == 0;
+      std::string description (f.get_data_ptr (), f.get_mfileid ().get_original_length ());
+      if (description.find (specification) != std::string::npos) {
+	return true;
       }
       return false;
     }
@@ -56,30 +54,34 @@ namespace dd {
     public mftp::match_candidate_predicate
   {
     bool operator() (const mftp::fileid& fid) const {
-      return fid.type == QUERY_TYPE;
+      return fid.type == SPECIFICATION;
     }
 
-    query_predicate* clone () const {
-      return new query_predicate (*this);
+    specification_predicate* clone () const {
+      return new specification_predicate (*this);
     }
   };
   
-  struct query_filename_predicate :
+  struct full_specification_predicate :
     public mftp::match_predicate
   {
-    std::string filename;
+    std::string description;
 
-    query_filename_predicate (const std::string& fname) :
-      filename (fname)
+    full_specification_predicate (const std::string& desc) :
+      description (desc)
     { }
 
     bool operator() (const mftp::file& f) const {
-      assert (f.get_mfileid ().get_fileid ().type == QUERY_TYPE);
-      return memcmp (filename.c_str (), f.get_data_ptr (), std::min (filename.size (), f.get_mfileid ().get_original_length ())) == 0;
+      assert (f.get_mfileid ().get_fileid ().type == SPECIFICATION);
+      std::string specification (f.get_data_ptr (), f.get_mfileid ().get_original_length ());
+      if (description.find (specification) != std::string::npos) {
+	return true;
+      }
+      return false;
     }
 
-    query_filename_predicate* clone () const {
-      return new query_filename_predicate (*this);
+    full_specification_predicate* clone () const {
+      return new full_specification_predicate (*this);
     }
   };
 
