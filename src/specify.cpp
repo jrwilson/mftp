@@ -15,10 +15,10 @@ namespace dd {
   private:
     ioa::handle_manager<spec_automaton> m_self;
     ioa::automaton_manager<mftp::mftp_channel_automaton>* channel;
-    std::map<mftp::fileid, ioa::automaton_manager<mftp::mftp_automaton>* > descs;
+    //std::map<mftp::fileid, ioa::automaton_manager<mftp::mftp_automaton>* > descs;
     std::string m_filename;
 
-    ioa::time m_transfer;  //necessary?
+    //ioa::time m_transfer;  //necessary?
 
     static const ioa::time PROGRESS_INTERVAL;
 
