@@ -1,3 +1,6 @@
+* Coordinate
+Coordinate announcements and matches so that only one node is sending.
+
 * TCP
 Study interference with TCP.
 

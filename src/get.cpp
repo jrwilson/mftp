@@ -56,9 +56,12 @@ namespace jam {
       }
     }
   
-    void match_complete_effect (const ioa::const_shared_ptr<mftp::file>& f) {
+    void match_complete_effect (const ioa::const_shared_ptr<mftp::file>& meta_file) {
+      // Create the meta server.
+      new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (*meta_file, channel->get_handle (), query_predicate (), query_filename_predicate (m_filename), false, false));
+
       mftp::fileid fid;
-      memcpy (&fid, f->get_data_ptr (), sizeof (mftp::fileid));
+      memcpy (&fid, meta_file->get_data_ptr (), sizeof (mftp::fileid));
       fid.convert_to_host();
       
       ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), channel->get_handle(), false));
