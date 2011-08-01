@@ -58,26 +58,29 @@ namespace dd {
     }
 
     void match_complete_effect (const ioa::const_shared_ptr<mftp::file>& f) {
-      std::string path (m_filename+ "-" + f->get_mfileid ().get_fileid ().to_string ());
-      FILE* fp = fopen (path.c_str (), "w");
-      if (fp == NULL) {
-	perror ("fopen");
-	exit (EXIT_FAILURE);
-      }
+      // std::string path (m_filename+ "-" + f->get_mfileid ().get_fileid ().to_string ());
+      // FILE* fp = fopen (path.c_str (), "w");
+      // if (fp == NULL) {
+      // 	perror ("fopen");
+      // 	exit (EXIT_FAILURE);
+      // }
 
-      size_t er = fwrite (static_cast <const char*> (f->get_data_ptr ()), 1, f->get_mfileid ().get_original_length (), fp);
-      if (er < f->get_mfileid ().get_original_length ()) {
-	std::cerr << "fwrite: couldn't write to " << m_filename << std::endl;
-	exit (EXIT_FAILURE);
-      }
+      // size_t er = fwrite (static_cast <const char*> (f->get_data_ptr ()), 1, f->get_mfileid ().get_original_length (), fp);
+      // if (er < f->get_mfileid ().get_original_length ()) {
+      // 	std::cerr << "fwrite: couldn't write to " << m_filename << std::endl;
+      // 	exit (EXIT_FAILURE);
+      // }
 
-      int err = fclose (fp);
-      if (err != 0) {
-	perror ("fclose");
-	exit (EXIT_FAILURE);
-      }
+      // int err = fclose (fp);
+      // if (err != 0) {
+      // 	perror ("fclose");
+      // 	exit (EXIT_FAILURE);
+      // }
 
-      std::cout << "Created " << path << std::endl;
+      // std::cout << "Created " << path << std::endl;
+
+      std::cout << "I matched something!" << std::endl;
+
     }
 
   public:
