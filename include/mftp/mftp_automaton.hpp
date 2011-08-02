@@ -123,7 +123,6 @@ namespace mftp {
 			     &ioa::alarm_automaton::alarm,
 			     &m_self,
 			     &mftp_automaton::announcement_timer_interrupt);
-
       if (m_matching) {
 	ioa::automaton_manager<ioa::alarm_automaton>* matching_clock = new ioa::automaton_manager<ioa::alarm_automaton> (this, ioa::make_generator<ioa::alarm_automaton> ());
 	ioa::make_binding_manager (this,
@@ -495,7 +494,8 @@ namespace mftp {
 	    m_pending_requests += (spans[sp_count].stop - spans[sp_count].start)/FRAGMENT_SIZE;
 	  }
 	}
-	
+
+	std::cout << "Sending request" << std::endl;
 	message_buffer* m = new message_buffer (request_type (), m_fileid, sp_count, spans);
 	m->convert_to_network ();
 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
@@ -698,7 +698,9 @@ namespace mftp {
 	m_matches.insert (fid);
 	m_matchq.push_front (fid);
 	m_send_match = true;
-	m_matching_files.push (ioa::const_shared_ptr<file> (new file (f)));
+	if (m_get_matching_files) {
+	  m_matching_files.push (ioa::const_shared_ptr<file> (new file (f)));
+	}
       }
       else {
 	m_non_matches.insert (fid);
