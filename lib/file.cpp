@@ -169,7 +169,7 @@ namespace mftp {
     }
   }
 
-  span_t file::get_next_range () {
+  std::pair<uint32_t, uint32_t> file::get_next_range () {
     // We shouldn't have all the fragments.
     assert (m_have_count != m_mfileid.get_fragment_count ());
 
@@ -179,13 +179,9 @@ namespace mftp {
       pos = m_dont_have.begin ();
     }
       
-    // Request range [m_start_idx, end_idx).
-    span_t retval;
-    retval.start = pos->first * FRAGMENT_SIZE;
-    retval.stop = pos->second * FRAGMENT_SIZE;
+    // Request range.
     m_start_idx = pos->second;
-
-    return retval;
+    return std::pair<uint32_t, uint32_t> (pos->first * FRAGMENT_SIZE, pos->second * FRAGMENT_SIZE);
   }
 
   uint32_t file::get_random_index () const {

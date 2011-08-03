@@ -1,8 +1,7 @@
 #ifndef __message_hpp__
 #define __message_hpp__
 
-#include <mftp/fileid.hpp>
-#include <mftp/span.hpp>
+#include <mftp/mfileid.hpp>
 #include <ioa/buffer.hpp>
 
 namespace mftp {
@@ -31,6 +30,29 @@ namespace mftp {
       mfileid mid (fid);
       return ((offset % FRAGMENT_SIZE) == 0) && (offset < mid.get_final_length ());
     }
+  };
+
+  struct span_t
+  {
+    uint32_t start;
+    uint32_t stop;
+
+    span_t& operator= (const std::pair<uint32_t, uint32_t>& p) {
+      start = p.first;
+      stop = p.second;
+      return *this;
+    }
+
+    void convert_to_network () {
+      start = htonl (start);
+      stop = htonl (stop);
+    }
+    
+    void convert_to_host () {
+      start = ntohl (start);
+      stop = ntohl (stop);
+    }
+
   };
     
   struct request

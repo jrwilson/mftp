@@ -2,8 +2,7 @@
 #define __file_hpp__
 
 #include <mftp/interval_set.hpp>
-#include <mftp/fileid.hpp>
-#include <mftp/span.hpp>
+#include <mftp/mfileid.hpp>
 
 namespace mftp {
   
@@ -35,7 +34,7 @@ namespace mftp {
     bool empty () const;
     bool write_chunk (const uint32_t offset,
 		      const void* data);
-    span_t get_next_range ();
+    std::pair<uint32_t, uint32_t> get_next_range ();
     uint32_t get_random_index () const;
     uint32_t get_progress () const;
   };
