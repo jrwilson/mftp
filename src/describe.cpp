@@ -42,7 +42,7 @@ namespace dd {
 	  std::string desc_string (static_cast<const char*> (file.get_data_ptr ()), file.get_mfileid ().get_original_length ());
 	  std::cout << "description: \n" << desc_string << std::endl;
 	  //Create the description server.
-	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, channel->get_handle (), specification_predicate (), full_specification_predicate (desc_string), false, false));
+	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, channel->get_handle (), specification_predicate (), full_specification_predicate (desc_string), false, false, 0));
 	}
       }
     }

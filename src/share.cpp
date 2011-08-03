@@ -53,10 +53,10 @@ namespace jam {
 	  mftp::file meta (buff.data (), buff.size (), META_TYPE);
 	
 	  // Create the file server.
-	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, channel->get_handle(), false));
+	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, channel->get_handle(), false, 0));
 	
 	  // Create the meta server.
-	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, channel->get_handle (), query_predicate (), query_filename_predicate (m_sharename), false, false));
+	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, channel->get_handle (), query_predicate (), query_filename_predicate (m_sharename), false, false, 0));
 
 	}
       }

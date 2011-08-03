@@ -9,7 +9,8 @@ namespace mftp {
   // Not matching.
   mftp_automaton::mftp_automaton (const file& file,
 				  const ioa::automaton_handle<mftp_channel_automaton>& channel,
-				  const bool suicide) :
+				  const bool suicide,
+				  const uint32_t progress_threshold) :
     m_self (ioa::get_aid ()),
     m_file (file),
     m_mfileid (file.get_mfileid ()),
@@ -27,7 +28,9 @@ namespace mftp {
     m_channel (channel),
     m_matching (false),
     m_get_matching_files (false),
-    m_suicide_flag (suicide)
+    m_suicide_flag (suicide),
+    m_fragments_since_report (0),
+    m_progress_threshold (progress_threshold)
   {
     create_bindings ();
   }
@@ -38,7 +41,8 @@ namespace mftp {
 				  const match_candidate_predicate& match_candidate_pred,
 				  const match_predicate& match_pred,
 				  const bool get_matching_files,
-				  const bool suicide) :
+				  const bool suicide,
+				  const uint32_t progress_threshold) :
     m_self (ioa::get_aid ()),
     m_file (file),
     m_mfileid (file.get_mfileid ()),
@@ -58,7 +62,9 @@ namespace mftp {
     m_match_candidate_predicate (match_candidate_pred.clone ()),
     m_match_predicate (match_pred.clone ()),
     m_get_matching_files (get_matching_files),
-    m_suicide_flag (suicide)
+    m_suicide_flag (suicide),
+    m_fragments_since_report (0),
+    m_progress_threshold (progress_threshold)
   {
     create_bindings ();
   }
@@ -112,6 +118,9 @@ namespace mftp {
     }
     if (suicide_precondition ()) {
       ioa::schedule (&mftp_automaton::suicide);
+    }
+    if (fragment_count_precondition ()) {
+      ioa::schedule (&mftp_automaton::fragment_count);
     }
   }
 
@@ -248,6 +257,7 @@ namespace mftp {
 	      // Reset the request interval.
 	      m_request_interval = INIT_INTERVAL;
 	      send_request ();
+	      ++m_fragments_since_report;
 	    }
 	  }
 	}
@@ -272,7 +282,7 @@ namespace mftp {
 	  else {
 	    // Create an mftp_automaton with MATCHING FALSE and PROGRESS FALSE to download other file.
 	    // Perform matching when the download is complete.
-	    ioa::automaton_manager<mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp_automaton> (this, ioa::make_generator<mftp_automaton> (f, m_channel.get_handle(), true));
+	    ioa::automaton_manager<mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp_automaton> (this, ioa::make_generator<mftp_automaton> (f, m_channel.get_handle(), true, 0));
 	      
 	    ioa::make_binding_manager (this,
 				       new_file_home, &mftp_automaton::download_complete,
@@ -334,7 +344,7 @@ namespace mftp {
 		  // Create an mftp_automaton with MATCHING FALSE to download other file.
 		  // Perform matching when the download is complete.
 		  file f (m->mat.fid);
-		  ioa::automaton_manager<mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp_automaton> (this, ioa::make_generator<mftp_automaton> (f, m_channel.get_handle(), true));
+		  ioa::automaton_manager<mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp_automaton> (this, ioa::make_generator<mftp_automaton> (f, m_channel.get_handle(), true, 0));
 		    
 		  ioa::make_binding_manager (this,
 					     new_file_home, &mftp_automaton::download_complete,
@@ -365,7 +375,7 @@ namespace mftp {
 		  // Create an mftp_automaton with MATCHING FALSE to download other file.
 		  // Perform matching when the download is complete.
 		  file f (m->mat.matches[idx]);
-		  ioa::automaton_manager<mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp_automaton> (this, ioa::make_generator<mftp_automaton> (f, m_channel.get_handle(), true));
+		  ioa::automaton_manager<mftp_automaton>* new_file_home = new ioa::automaton_manager<mftp_automaton> (this, ioa::make_generator<mftp_automaton> (f, m_channel.get_handle(), true, 0));
 		    
 		  ioa::make_binding_manager (this,
 					     new_file_home, &mftp_automaton::download_complete,
@@ -482,6 +492,15 @@ namespace mftp {
   message_buffer* mftp_automaton::get_fragment (uint32_t idx) {
     uint32_t offset = idx * FRAGMENT_SIZE;
     return new message_buffer (fragment_type (), m_fileid, offset, static_cast<const char*> (m_file.get_data_ptr ()) + offset);
+  }
+
+  bool mftp_automaton::fragment_count_precondition () const {
+    return m_fragments_since_report >= m_progress_threshold;
+  }
+
+  uint32_t mftp_automaton::fragment_count_effect () {
+    m_fragments_since_report = 0;
+    return m_file.have_count ();
   }
 
 }

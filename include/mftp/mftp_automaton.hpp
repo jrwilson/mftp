@@ -68,11 +68,15 @@ namespace mftp {
 
     std::queue<ioa::const_shared_ptr<file> > m_matching_files; // Queue of matching files.
 
+    uint32_t m_fragments_since_report; // Number of fragments received since last progress report.
+    uint32_t m_progress_threshold; // Accumulate this many fragments before reporting progress.
+
   public:
     // Not matching.
     mftp_automaton (const file& file,
 		    const ioa::automaton_handle<mftp_channel_automaton>& channel,
-		    const bool suicide);
+		    const bool suicide,
+		    const uint32_t progress_threshold);
 
     // Matching.
     mftp_automaton (const file& file,
@@ -80,7 +84,8 @@ namespace mftp {
 		    const match_candidate_predicate& match_candidate_pred,
 		    const match_predicate& match_pred,
 		    const bool get_matching_files,
-		    const bool suicide);
+		    const bool suicide,
+		    const uint32_t progress_threshold);
 
   private:
     void create_bindings ();
@@ -113,12 +118,6 @@ namespace mftp {
     void timer_interrupt_effect ();
     UV_UP_INPUT (mftp_automaton, timer_interrupt);
 
-    bool download_complete_precondition () const;
-    file download_complete_effect ();
-  public:
-    V_UP_OUTPUT (mftp_automaton, download_complete, file);
-
-  private: 
     bool suicide_precondition () const;
     void suicide_effect ();
     UP_INTERNAL (mftp_automaton, suicide);
@@ -127,6 +126,19 @@ namespace mftp {
 					 ioa::aid_t aid);
     V_AP_INPUT (mftp_automaton, match_download_complete, file);
 
+  private:
+    bool fragment_count_precondition () const;
+    uint32_t fragment_count_effect ();
+  public:
+    V_UP_OUTPUT (mftp_automaton, fragment_count, uint32_t);
+
+  private:
+    bool download_complete_precondition () const;
+    file download_complete_effect ();
+  public:
+    V_UP_OUTPUT (mftp_automaton, download_complete, file);
+
+  private: 
     bool match_complete_precondition () const;
     ioa::const_shared_ptr<file> match_complete_effect ();
   public:

@@ -48,7 +48,7 @@ namespace dd {
 	  std::string spec_string (static_cast<const char*> (spec.get_data_ptr ()), spec.get_mfileid ().get_original_length ());
 	  std::cout << "specification: " << spec_string << std::endl;
 	  //Create the spec server.
-	  ioa::automaton_manager<mftp::mftp_automaton>* spec_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (spec, channel->get_handle(), description_predicate (), full_description_predicate (spec_string), true, false));
+	  ioa::automaton_manager<mftp::mftp_automaton>* spec_server = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (spec, channel->get_handle(), description_predicate (), full_description_predicate (spec_string), true, false, 0));
 
 	  ioa::make_binding_manager (this,
 				     spec_server, &mftp::mftp_automaton::match_complete,
