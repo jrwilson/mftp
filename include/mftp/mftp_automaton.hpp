@@ -15,11 +15,9 @@ namespace mftp {
     public ioa::automaton
   {
   private:
-    static const ioa::time REQUEST_INTERVAL;
-    static const ioa::time INIT_ANNOUNCEMENT_INTERVAL;
-    static const ioa::time MAX_ANNOUNCEMENT_INTERVAL;
-    static const ioa::time MATCHING_INTERVAL;
-    static const ioa::time PROGRESS_INTERVAL;
+    static const ioa::time TIMER_INTERVAL;
+    static const ioa::time INIT_INTERVAL;
+    static const ioa::time MAX_INTERVAL;
     static const size_t MAX_FRAGMENT_COUNT;
 
     enum send_state_t {
@@ -40,38 +38,35 @@ namespace mftp {
     const mfileid& m_mfileid;
     const fileid& m_fileid;
     interval_set<uint32_t> m_requests; // Set of intervals indicating fragments that have been requested.
-    uint32_t m_last_sent_idx; //Index of last fragment sent
-    std::queue<ioa::const_shared_ptr<message_buffer> > m_sendq;
-    send_state_t m_send_state;
-    size_t m_fragment_count;
-    bool m_send_request;
-    bool m_send_announcement;
-    bool m_send_match;
-    timer_state_t m_request_timer_state;
-    timer_state_t m_announcement_timer_state;
-    timer_state_t m_matching_timer_state;
-    timer_state_t m_progress_timer_state;
-    ioa::time m_announcement_interval;
+    uint32_t m_last_sent_idx; // Index of last fragment sent.
+    std::queue<ioa::const_shared_ptr<message_buffer> > m_sendq; // Send queue.
+    send_state_t m_send_state; // State of send state machine.
+    size_t m_fragment_count; // Number of fragments in the send queue.
+    ioa::time m_fragment_time; // Time when this automaton last received a fragment (of this file).
+    ioa::time m_request_time; // Time when this automaton last sent a request.
+    ioa::time m_match_time; // Time when this automaton last received a match (of this file).
+    timer_state_t m_timer_state; // State of time state machine.
+    ioa::time m_announcement_interval; // Must wait this amount of time after m_fragment_time to send an announcement.
+    ioa::time m_request_interval; // Must wait this amount of time after m_request_time to send a request.
+    ioa::time m_match_interval; // Must wait this amount of time after m_match_time to send a match.
     bool m_reported; // True when we have reported a complete download.
-    bool m_progress;
-    uint32_t m_pending_requests;
-    uint32_t m_since_received;
+    uint32_t m_last_request_size; // Number of fragments in most recent request.
+    uint32_t m_fragments_since_request; // Fragments received since most recent request.
 
-    ioa::handle_manager<mftp_channel_automaton> m_channel;
+    ioa::handle_manager<mftp_channel_automaton> m_channel; // The channel for sending/receiving.
 
     const bool m_matching; // Try to find matches for this file.
     std::auto_ptr<match_candidate_predicate> m_match_candidate_predicate;
     std::auto_ptr<match_predicate> m_match_predicate;
     const bool m_get_matching_files; // Always get matching files.
 
-    bool m_suicide_flag;  //Self-destruct when job is done.
+    bool m_suicide_flag;  // Self-destruct when job is done.
 
-    std::set<fileid> m_pending_matches;
-    std::set<fileid> m_matches;
-    std::set<fileid> m_non_matches;
-    std::deque<fileid> m_matchq;
+    std::set<fileid> m_pending_matches; // Fileids that are pending a download for matching.
+    std::set<fileid> m_matches; // Fileids that match.
+    std::set<fileid> m_non_matches; // Fileids that don't match.
 
-    std::queue<ioa::const_shared_ptr<file> > m_matching_files;
+    std::queue<ioa::const_shared_ptr<file> > m_matching_files; // Queue of matching files.
 
   public:
     // Not matching.
@@ -91,8 +86,11 @@ namespace mftp {
     void create_bindings ();
     void schedule () const;
     void process_match_candidate (const file& f);
-    void advance_to_next_request_index ();
     message_buffer* get_fragment (uint32_t idx);
+    void send_announcement ();
+    void send_request ();
+    void send_match ();
+    void add_match (const fileid& fid);
 
     bool send_precondition () const;
     ioa::const_shared_ptr<message_buffer> send_effect ();
@@ -108,52 +106,13 @@ namespace mftp {
     void send_fragment_effect ();
     UP_INTERNAL (mftp_automaton, send_fragment);
 
-    bool send_request_precondition () const;
-    void send_request_effect ();
-    UP_INTERNAL (mftp_automaton, send_request);
+    bool set_timer_precondition () const;
+    ioa::time set_timer_effect ();
+    V_UP_OUTPUT (mftp_automaton, set_timer, ioa::time);
 
-    bool send_announcement_precondition () const;
-    void send_announcement_effect ();
-    UP_INTERNAL (mftp_automaton, send_announcement);
+    void timer_interrupt_effect ();
+    UV_UP_INPUT (mftp_automaton, timer_interrupt);
 
-    bool send_match_precondition () const;
-    void send_match_effect ();
-    UP_INTERNAL (mftp_automaton, send_match);
-
-    bool set_request_timer_precondition () const;
-    ioa::time set_request_timer_effect ();
-    V_UP_OUTPUT (mftp_automaton, set_request_timer, ioa::time);
-
-    void request_timer_interrupt_effect ();
-    UV_UP_INPUT (mftp_automaton, request_timer_interrupt);
-
-    bool set_announcement_timer_precondition () const;
-    ioa::time set_announcement_timer_effect ();
-    V_UP_OUTPUT (mftp_automaton, set_announcement_timer, ioa::time);
-    
-    void announcement_timer_interrupt_effect ();
-    UV_UP_INPUT (mftp_automaton, announcement_timer_interrupt);
-
-    bool set_match_timer_precondition () const;
-    ioa::time set_match_timer_effect ();
-    V_UP_OUTPUT (mftp_automaton, set_match_timer, ioa::time);
-
-    void matching_timer_interrupt_effect ();
-    UV_UP_INPUT (mftp_automaton, matching_timer_interrupt);
-
-    bool set_progress_timer_precondition () const;
-    ioa::time set_progress_timer_effect ();
-    V_UP_OUTPUT (mftp_automaton, set_progress_timer, ioa::time);
-
-    void progress_timer_interrupt_effect ();
-    UV_UP_INPUT (mftp_automaton, progress_timer_interrupt);
-
-    bool report_progress_precondition () const;
-    uint32_t report_progress_effect ();
-  public:
-    V_UP_OUTPUT (mftp_automaton, report_progress, uint32_t);
-
-  private:
     bool download_complete_precondition () const;
     file download_complete_effect ();
   public:

@@ -36,7 +36,6 @@ namespace mftp {
 		      const void* data);
     std::pair<uint32_t, uint32_t> get_next_range ();
     uint32_t get_random_index () const;
-    uint32_t get_progress () const;
   };
 }
 

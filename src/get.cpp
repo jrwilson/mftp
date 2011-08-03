@@ -72,9 +72,9 @@ namespace jam {
 				 file_home, &mftp::mftp_automaton::download_complete,
 				 &m_self, &mftp_client_automaton::file_complete);
 
-      ioa::make_binding_manager (this,
-				 file_home, &mftp::mftp_automaton::report_progress,
-				 &m_self, &mftp_client_automaton::update_progress);
+      // ioa::make_binding_manager (this,
+      // 				 file_home, &mftp::mftp_automaton::report_progress,
+      // 				 &m_self, &mftp_client_automaton::update_progress);
 
       m_transfer = ioa::time::now ();
     }

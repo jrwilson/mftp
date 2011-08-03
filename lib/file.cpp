@@ -195,8 +195,4 @@ namespace mftp {
 
     return rf;  
   }
-
-  uint32_t file::get_progress () const {
-    return m_have_count;
-  }
 }
