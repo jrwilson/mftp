@@ -213,6 +213,7 @@ namespace mftp {
     assert (m_matches.count (fid) == 0);
     m_matches.insert (fid);
     // Reset the interval because we have something new.
+    m_match_time = ioa::time ();
     m_match_interval = INIT_INTERVAL;
     send_match ();
   }
@@ -255,6 +256,7 @@ namespace mftp {
 	      uint32_t idx = (m->frag.offset / FRAGMENT_SIZE);
 	      m_requests.erase (std::make_pair (idx, idx + 1));
 	      // Reset the request interval.
+	      m_request_time = ioa::time ();
 	      m_request_interval = INIT_INTERVAL;
 	      send_request ();
 	      ++m_fragments_since_report;
