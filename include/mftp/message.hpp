@@ -5,9 +5,10 @@
 #include <ioa/buffer.hpp>
 
 namespace mftp {
-  const uint32_t REQUEST = 0;
+  const uint32_t FIRST_FRAGMENT = 0;
   const uint32_t FRAGMENT = 1;
-  const uint32_t MATCH = 2;
+  const uint32_t REQUEST = 2;
+  const uint32_t MATCH = 3;
 
   const uint32_t SPANS_SIZE = 64;
   const uint32_t MATCHES_SIZE = 12;
@@ -136,6 +137,7 @@ namespace mftp {
     }
   };
 
+  struct first_fragment_type { };
   struct fragment_type { };
   struct request_type { };
   struct match_type { };
@@ -150,6 +152,17 @@ namespace mftp {
     };
 
     message () { }
+
+    message (first_fragment_type /* */,
+	     const fileid& fileid,
+	     uint32_t offset,
+	     const void* data)
+    {
+      header.message_type = FIRST_FRAGMENT;
+      frag.fid = fileid;
+      frag.offset = offset;
+      memcpy (frag.data, data, FRAGMENT_SIZE);
+    }
 
     message (fragment_type /* */,
 	     const fileid& fileid,
@@ -191,6 +204,7 @@ namespace mftp {
 
     void convert_to_network () {
       switch (header.message_type) {
+      case FIRST_FRAGMENT:
       case FRAGMENT:
         frag.convert_to_network ();
 	break;
@@ -207,6 +221,7 @@ namespace mftp {
     bool convert_to_host () {
       header.convert_to_host ();
       switch (header.message_type) {
+      case FIRST_FRAGMENT:
       case FRAGMENT:
         return frag.convert_to_host ();
       case REQUEST:
@@ -223,6 +238,13 @@ namespace mftp {
     public ioa::buffer_interface
   {
     message msg;
+
+    message_buffer (first_fragment_type type,
+		    const fileid& fileid,
+		    uint32_t offset,
+		    const void* data) :
+      msg (type, fileid, offset, data)
+    { }
 
     message_buffer (fragment_type type,
 		    const fileid& fileid,
