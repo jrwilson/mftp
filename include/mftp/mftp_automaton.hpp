@@ -70,7 +70,6 @@ namespace mftp {
 
     uint32_t m_fragments_since_report; // Number of fragments received since last progress report.
     uint32_t m_progress_threshold; // Accumulate this many fragments before reporting progress.
-    bool m_sent_first_announcement; // True if we have sent one announcement.
 
   public:
     // Not matching.
@@ -92,7 +91,6 @@ namespace mftp {
     void create_bindings ();
     void schedule () const;
     void process_match_candidate (const file& f);
-    message_buffer* get_first_fragment (uint32_t idx);
     message_buffer* get_fragment (uint32_t idx);
     void send_announcement ();
     void send_request (bool reset);

@@ -30,8 +30,7 @@ namespace mftp {
     m_get_matching_files (false),
     m_suicide_flag (suicide),
     m_fragments_since_report (0),
-    m_progress_threshold (progress_threshold),
-    m_sent_first_announcement (false)
+    m_progress_threshold (progress_threshold)
   {
     create_bindings ();
   }
@@ -65,8 +64,7 @@ namespace mftp {
     m_get_matching_files (get_matching_files),
     m_suicide_flag (suicide),
     m_fragments_since_report (0),
-    m_progress_threshold (progress_threshold),
-    m_sent_first_announcement (false)
+    m_progress_threshold (progress_threshold)
   {
     create_bindings ();
   }
@@ -134,15 +132,7 @@ namespace mftp {
       ioa::time now = ioa::time::now ();
       if (m_fragment_time + m_announcement_interval <= now) {
 	// Send a random fragment.
-	message_buffer* m;
-	if (!m_sent_first_announcement) {
-	  m_sent_first_announcement = true;
-	  m = get_first_fragment (m_file.get_random_index ());
-	}
-	else {
-	  // Send a random fragment.
-	  m = get_fragment (m_file.get_random_index ());
-	}
+	message_buffer* m = get_fragment (m_file.get_random_index ());
 	m->convert_to_network ();
 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
 	m_announcement_interval += m_announcement_interval;
@@ -247,8 +237,7 @@ namespace mftp {
   ioa::const_shared_ptr<message_buffer> mftp_automaton::send_effect () {
     ioa::const_shared_ptr<message_buffer> m = m_sendq.front ();
     m_sendq.pop ();
-    if (m->msg.header.message_type == htonl (FIRST_FRAGMENT) ||
-	m->msg.header.message_type == htonl (FRAGMENT)) {
+    if (m->msg.header.message_type == htonl (FRAGMENT)) {
       --m_fragment_count;
     }
     
@@ -262,14 +251,6 @@ namespace mftp {
 
   void mftp_automaton::receive_effect (const ioa::const_shared_ptr<message>& m) {
     switch (m->header.message_type) {
-    case FIRST_FRAGMENT:
-      {
-	if (m_matches.count (m->frag.fid) != 0) {
-	  // Send matches immediately.
-	  send_match (true);
-	}
-      }
-      // Fall through.
     case FRAGMENT:
       {
 	// If we are looking for our own file, it must be a fragment from our file and the offset must be correct.
@@ -520,18 +501,13 @@ namespace mftp {
     return f;
   }
 
-  message_buffer* mftp_automaton::get_first_fragment (uint32_t idx) {
-    uint32_t offset = idx * FRAGMENT_SIZE;
-    return new message_buffer (first_fragment_type (), m_fileid, offset, static_cast<const char*> (m_file.get_data_ptr ()) + offset);
-  }
-
   message_buffer* mftp_automaton::get_fragment (uint32_t idx) {
     uint32_t offset = idx * FRAGMENT_SIZE;
     return new message_buffer (fragment_type (), m_fileid, offset, static_cast<const char*> (m_file.get_data_ptr ()) + offset);
   }
 
   bool mftp_automaton::fragment_count_precondition () const {
-    return m_progress_threshold != 0 && m_fragments_since_report >= m_progress_threshold;
+    return !m_file.complete () && m_progress_threshold != 0 && m_fragments_since_report >= m_progress_threshold;
   }
 
   uint32_t mftp_automaton::fragment_count_effect () {

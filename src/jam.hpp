@@ -8,6 +8,7 @@ namespace jam {
 #define FILE_TYPE 0
 #define META_TYPE 1
 #define QUERY_TYPE 2    
+#define INSTANCE_TYPE 3
   
   const ioa::inet_address SEND_ADDR ("224.0.0.137", 54321);
   const ioa::inet_address LOCAL_ADDR ("0.0.0.0", 54321);

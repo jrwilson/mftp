@@ -1,11 +1,5 @@
-* Coordinate
-Coordinate announcements and matches so that only one node is sending.
-
 * Files
-Work with const shared pointers to files rather than files to eliminate copy time at the end of the transfer.
-
-* TCP
-Study interference with TCP.
+Work with pointers to files eliminate copying files.
 
 * Matches
 We accumulate matches without ever forgetting them.  We should purge matches that we haven't seen in a while.
