@@ -96,7 +96,7 @@ namespace mftp {
 			       &mftp_automaton::timer_interrupt);
 
     send_announcement ();
-    send_request (true);
+    send_request (false);
     schedule ();
   }
 
@@ -132,6 +132,7 @@ namespace mftp {
       ioa::time now = ioa::time::now ();
       if (m_fragment_time + m_announcement_interval <= now) {
 	// Send a random fragment.
+	std::cout << "Sending announcement" << std::endl;
 	message_buffer* m = get_fragment (m_file.get_random_index ());
 	m->convert_to_network ();
 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
@@ -145,13 +146,13 @@ namespace mftp {
   void mftp_automaton::send_request (bool reset) {
     if (!m_file.complete ()) {
 
+      ioa::time now = ioa::time::now ();
       // Reset if necessary.
       if (reset) {
-	m_request_time = ioa::time ();
+	m_request_time = now;
 	m_request_interval = INIT_INTERVAL;
       }
 
-      ioa::time now = ioa::time::now ();
       // If we have received more than 80% of the fragments we requested
       // Or enough time has elapsed
       if ((REQUEST_DENOMINATOR * m_fragments_since_request > REQUEST_NUMERATOR * m_last_request_size) ||
@@ -182,6 +183,7 @@ namespace mftp {
 	
 	message_buffer* m = new message_buffer (request_type (), m_fileid, sp_count, spans);
 	m->convert_to_network ();
+	std::cout << "Sending request" << std::endl;
 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
 	m_request_time = now;
 	m_fragments_since_request = 0;
@@ -192,14 +194,14 @@ namespace mftp {
   void mftp_automaton::send_match (bool reset) {
     if (!m_matches.empty ()) {
 
+      ioa::time now = ioa::time::now ();
       // Reset if required.
       if (reset) {
-	m_match_time = ioa::time ();
+	m_match_time = now;
 	m_match_interval = INIT_INTERVAL;
       }
 
       // Send matches if ready.
-      ioa::time now = ioa::time::now ();
       if (m_match_time + m_match_interval <= now) {
 	// TODO:  We assume that all matches can be send in m_match_interval.
 	std::set<fileid>::const_iterator pos = m_matches.begin ();
@@ -214,6 +216,7 @@ namespace mftp {
 
 	  message_buffer* m = new message_buffer (match_type (), m_fileid, count, matches);
 	  m->convert_to_network ();
+	  std::cout << "Sending match" << std::endl;
 	  m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
 	}
 

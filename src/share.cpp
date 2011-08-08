@@ -62,10 +62,6 @@ namespace jam {
 	
 	  // Create the meta server.
 	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, channel->get_handle (), query_predicate (m_sharename), query_filename_predicate (m_sharename), false, false, 0));
-
-	  //Create a query server.
-	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (query, channel->get_handle (), query_predicate (m_sharename), query_filename_predicate (m_sharename), false, false, 0));
-
 	}
       }
     }
