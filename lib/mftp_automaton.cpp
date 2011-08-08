@@ -192,14 +192,14 @@ namespace mftp {
   void mftp_automaton::send_match (bool reset) {
     if (!m_matches.empty ()) {
 
-      ioa::time now = ioa::time::now ();
       // Reset if required.
       if (reset) {
-	m_match_time = now;
+	m_match_time = ioa::time ();
 	m_match_interval = INIT_INTERVAL;
       }
 
       // Send matches if ready.
+      ioa::time now = ioa::time::now ();
       if (m_match_time + m_match_interval <= now) {
 	// TODO:  We assume that all matches can be send in m_match_interval.
 	std::set<fileid>::const_iterator pos = m_matches.begin ();
