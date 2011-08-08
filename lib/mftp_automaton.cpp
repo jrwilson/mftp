@@ -174,8 +174,14 @@ namespace mftp {
 	    ++sp_count;
 	    m_last_request_size += (spans[sp_count].stop - spans[sp_count].start)/FRAGMENT_SIZE;
 	  }
+
+	  std::cout << "Requesting ";
+	  for (uint32_t i = 0; i < sp_count; ++i) {
+	    std::cout << "[" << spans[i].start / FRAGMENT_SIZE << "," << spans[i].stop / FRAGMENT_SIZE << ") ";
+	  }
+	  std::cout << std::endl;
 	}
-	
+
 	message_buffer* m = new message_buffer (request_type (), m_fileid, sp_count, spans);
 	m->convert_to_network ();
 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
@@ -256,17 +262,26 @@ namespace mftp {
 	  // Record the time.
 	  m_fragment_time = ioa::time::now ();
 
+	  // Remove fragment from requests.
+	  uint32_t idx = (m->frag.offset / FRAGMENT_SIZE);
+	  m_requests.erase (std::make_pair (idx, idx + 1));
+
 	  // Save the fragment.
 	  if (!m_file.complete ()) {
-	    if (m_file.write_chunk (m->frag.offset, m->frag.data)) {
+	    std::cout << "Writing " << m->frag.offset / FRAGMENT_SIZE << std::endl;
+	    if (m_file.write_chunk (m->frag.offset, m->frag.data)) {	      
 	      ++m_fragments_since_request;
-	      // Remove fragment from requests.
-	      uint32_t idx = (m->frag.offset / FRAGMENT_SIZE);
-	      m_requests.erase (std::make_pair (idx, idx + 1));
 	      // Reset the request interval.
 	      send_request (true);
 	      ++m_fragments_since_report;
 	    }
+
+	    for (interval_set<uint32_t>::const_iterator pos = m_file.m_dont_have.begin ();
+		 pos != m_file.m_dont_have.end ();
+		 ++pos) {
+	      std::cout << "[" << pos->first << "," << pos->second << ") ";
+	    }
+	    std::cout << std::endl;
 	  }
 	}
 
@@ -311,7 +326,6 @@ namespace mftp {
 		m->req.spans[sp].stop % FRAGMENT_SIZE == 0 &&
 		m->req.spans[sp].start < m->req.spans[sp].stop &&
 		m->req.spans[sp].stop <= m_mfileid.get_final_length ()) {
-	      // We have it.
 	      requests.insert (std::make_pair (m->req.spans[sp].start / FRAGMENT_SIZE, m->req.spans[sp].stop / FRAGMENT_SIZE));
 	    }
 	  }
