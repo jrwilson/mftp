@@ -427,6 +427,13 @@ namespace mftp {
     m->convert_to_network ();
     m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
     ++m_fragment_count;
+
+    for (interval_set<uint32_t>::const_iterator pos = m_requests.begin ();
+	 pos != m_requests.end ();
+	 ++pos) {
+      std::cout << "[" << pos->first << "," << pos->second << ") ";
+    }
+    std::cout << std::endl;
   }  
 
   bool mftp_automaton::set_timer_precondition () const {
