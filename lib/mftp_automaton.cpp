@@ -132,7 +132,6 @@ namespace mftp {
       ioa::time now = ioa::time::now ();
       if (m_fragment_time + m_announcement_interval <= now) {
 	// Send a random fragment.
-	std::cout << "Sending announcement" << std::endl;
 	message_buffer* m = get_fragment (m_file.get_random_index ());
 	m->convert_to_network ();
 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
@@ -183,7 +182,6 @@ namespace mftp {
 	
 	message_buffer* m = new message_buffer (request_type (), m_fileid, sp_count, spans);
 	m->convert_to_network ();
-	std::cout << "Sending request" << std::endl;
 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
 	m_request_time = now;
 	m_fragments_since_request = 0;
@@ -216,7 +214,6 @@ namespace mftp {
 
 	  message_buffer* m = new message_buffer (match_type (), m_fileid, count, matches);
 	  m->convert_to_network ();
-	  std::cout << "Sending match" << std::endl;
 	  m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
 	}
 
