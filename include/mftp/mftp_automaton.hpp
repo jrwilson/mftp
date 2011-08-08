@@ -93,8 +93,8 @@ namespace mftp {
     void process_match_candidate (const file& f);
     message_buffer* get_fragment (uint32_t idx);
     void send_announcement ();
-    void send_request ();
-    void send_match ();
+    void send_request (bool reset);
+    void send_match (bool reset);
     void add_match (const fileid& fid);
 
     bool send_precondition () const;

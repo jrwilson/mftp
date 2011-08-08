@@ -8,6 +8,8 @@
 
 namespace jam {
 
+  const size_t FRAG_COUNT = 1;
+
   class mftp_client_automaton :
     public ioa::automaton,
     private ioa::observer {
@@ -20,8 +22,6 @@ namespace jam {
     std::string m_filename;
 
     ioa::time m_transfer;
-
-    static const ioa::time PROGRESS_INTERVAL;
 
   public:
     mftp_client_automaton (std::string fname) :
@@ -75,9 +75,7 @@ namespace jam {
       memcpy (&fid, meta_file->get_data_ptr (), sizeof (mftp::fileid));
       fid.convert_to_host();
       
-      mftp::mfileid mfid (fid);
-
-      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), channel->get_handle(), false, mfid.get_fragment_count () / 100));
+      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), channel->get_handle(), false, FRAG_COUNT));
 
       data_files.insert(std::make_pair(fid, file_home));
       

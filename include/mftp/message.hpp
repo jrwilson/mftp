@@ -5,8 +5,8 @@
 #include <ioa/buffer.hpp>
 
 namespace mftp {
-  const uint32_t REQUEST = 0;
-  const uint32_t FRAGMENT = 1;
+  const uint32_t FRAGMENT = 0;
+  const uint32_t REQUEST = 1;
   const uint32_t MATCH = 2;
 
   const uint32_t SPANS_SIZE = 64;

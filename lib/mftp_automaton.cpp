@@ -96,7 +96,7 @@ namespace mftp {
 			       &mftp_automaton::timer_interrupt);
 
     send_announcement ();
-    send_request ();
+    send_request (true);
     schedule ();
   }
 
@@ -142,8 +142,15 @@ namespace mftp {
     }
   }
   
-  void mftp_automaton::send_request () {
+  void mftp_automaton::send_request (bool reset) {
     if (!m_file.complete ()) {
+
+      // Reset if necessary.
+      if (reset) {
+	m_request_time = ioa::time ();
+	m_request_interval = INIT_INTERVAL;
+      }
+
       ioa::time now = ioa::time::now ();
       // If we have received more than 80% of the fragments we requested
       // Or enough time has elapsed
@@ -160,7 +167,7 @@ namespace mftp {
 	uint32_t sp_count = 1;
 	m_last_request_size = (spans[0].stop-spans[0].start) / FRAGMENT_SIZE;
 	bool looking = true;
-	while (looking){
+	while (looking) {
 	  span_t range;
 	  range = m_file.get_next_range ();
 	  if (range.start == spans[0].start || sp_count == SPANS_SIZE){ //when we've come back to the range we started on, or we have as many ranges as we can hold
@@ -182,12 +189,19 @@ namespace mftp {
     }
   }
 
-  void mftp_automaton::send_match () {
+  void mftp_automaton::send_match (bool reset) {
     if (!m_matches.empty ()) {
+
+      // Reset if required.
+      if (reset) {
+	m_match_time = ioa::time ();
+	m_match_interval = INIT_INTERVAL;
+      }
+
+      // Send matches if ready.
       ioa::time now = ioa::time::now ();
       if (m_match_time + m_match_interval <= now) {
 	// TODO:  We assume that all matches can be send in m_match_interval.
-
 	std::set<fileid>::const_iterator pos = m_matches.begin ();
 	while (pos != m_matches.end ()) {
 	  uint32_t count = 0;
@@ -213,9 +227,7 @@ namespace mftp {
     assert (m_matches.count (fid) == 0);
     m_matches.insert (fid);
     // Reset the interval because we have something new.
-    m_match_time = ioa::time ();
-    m_match_interval = INIT_INTERVAL;
-    send_match ();
+    send_match (true);
   }
 
   bool mftp_automaton::send_precondition () const {
@@ -256,9 +268,7 @@ namespace mftp {
 	      uint32_t idx = (m->frag.offset / FRAGMENT_SIZE);
 	      m_requests.erase (std::make_pair (idx, idx + 1));
 	      // Reset the request interval.
-	      m_request_time = ioa::time ();
-	      m_request_interval = INIT_INTERVAL;
-	      send_request ();
+	      send_request (true);
 	      ++m_fragments_since_report;
 	    }
 	  }
@@ -437,8 +447,8 @@ namespace mftp {
     m_timer_state = SET_READY;
 
     send_announcement ();
-    send_request ();
-    send_match ();
+    send_request (false);
+    send_match (false);
   }
 
   bool mftp_automaton::download_complete_precondition () const {
@@ -460,7 +470,7 @@ namespace mftp {
   }
 
   void mftp_automaton::match_download_complete_effect (const file& f,
-				       ioa::aid_t aid) {
+						       ioa::aid_t aid) {
     //For use when the child has reported a download_complete.
     process_match_candidate (f);
   }
@@ -497,7 +507,7 @@ namespace mftp {
   }
 
   bool mftp_automaton::fragment_count_precondition () const {
-    return m_fragments_since_report >= m_progress_threshold;
+    return !m_file.complete () && m_progress_threshold != 0 && m_fragments_since_report >= m_progress_threshold;
   }
 
   uint32_t mftp_automaton::fragment_count_effect () {
