@@ -146,22 +146,18 @@ namespace mftp {
     if (!m_file.complete ()) {
 
       ioa::time now = ioa::time::now ();
-      // Reset if necessary.
-      if (reset) {
-	m_request_time = now;
-	m_request_interval = INIT_INTERVAL;
+      bool time_flag = (m_request_time + m_request_interval <= now);
+      bool frag_flag = (REQUEST_DENOMINATOR * m_fragments_since_request > REQUEST_NUMERATOR * m_last_request_size);
+
+      if (time_flag && !frag_flag) {
+	// Increase the interval.
+	m_request_interval += m_request_interval;
+	m_request_interval = std::min (m_request_interval, MAX_INTERVAL);
       }
 
       // If we have received more than 80% of the fragments we requested
       // Or enough time has elapsed
-      if ((REQUEST_DENOMINATOR * m_fragments_since_request > REQUEST_NUMERATOR * m_last_request_size) ||
-	  (m_request_time + m_request_interval <= now)) {
-	// Increase the interval.
-	if (m_request_time + m_request_interval <= now) {
-	  m_request_interval += m_request_interval;
-	  m_request_interval = std::min (m_request_interval, MAX_INTERVAL);
-	}
-
+      if (time_flag || frag_flag) {
 	span_t spans[SPANS_SIZE];
 	spans[0] = m_file.get_next_range ();
 	uint32_t sp_count = 1;
