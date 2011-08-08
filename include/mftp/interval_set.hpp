@@ -7,9 +7,10 @@
 
 template <typename Key> 
 class interval_set {
-private:
+public:
   typedef std::pair<const Key, const Key> interval_type;
 
+private:
   class interval_lt {
   public:
     bool operator() (const interval_type& x, const interval_type& y) const {
@@ -90,12 +91,12 @@ public:
     }
   }
 
-private:
-  static bool intersect (const interval_type& x, const interval_type& y) {
+public:
+  static bool intersect (const interval_type& x,
+			 const interval_type& y) {
     return std::max (x.first, y.first) <= std::min (x.second, y.second);
   } 
 
-public:
   std::pair<iterator, bool>
   insert (const value_type& x) {
 

@@ -153,13 +153,20 @@ namespace mftp {
     assert (offset < m_mfileid.get_final_length ());
 
     const uint32_t idx = offset / FRAGMENT_SIZE;
-    interval_set<uint32_t>::const_iterator pos = m_dont_have.lower_bound (std::make_pair (idx, idx + 1));
-    if (pos != m_dont_have.end () && pos->first <= idx) {
+    const interval_set<uint32_t>::interval_type interval = std::make_pair (idx, idx + 1);
+    interval_set<uint32_t>::const_iterator after = m_dont_have.lower_bound (interval);
+    interval_set<uint32_t>::const_iterator before = after;
+    if (before != m_dont_have.begin ()) {
+      --before;
+    }
+    
+    if ((before != m_dont_have.end () && interval_set<uint32_t>::intersect (*before, interval)) ||
+	(after != m_dont_have.end () && interval_set<uint32_t>::intersect (*before, interval))) {
       // Don't have.
       // Copy it.
       memcpy (m_data + offset, data, FRAGMENT_SIZE);
       // Now we have it.
-      m_dont_have.erase (std::make_pair (idx, idx + 1));
+      m_dont_have.erase (interval);
       ++m_have_count;
       return true;
     }
