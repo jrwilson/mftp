@@ -47,11 +47,22 @@ namespace jam {
 	  mftp::file f (m_filename.c_str (), m_filename.size (), QUERY_TYPE);
 
 	  // Create the query server.
-	  ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, channel->get_handle (), meta_predicate (), meta_filename_predicate (m_filename), true, false, 0));
+	  ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, channel->get_handle (), meta_predicate (), meta_inst_filename_predicate (m_filename), true, false, 0));
 	  
 	  ioa::make_binding_manager (this,
 				     query, &mftp::mftp_automaton::match_complete,
 				     &m_self, &mftp_client_automaton::match_complete);
+
+	  //Create the instance server.
+	  uuid_t id;
+	  uuid_generate (id);
+
+	  ioa::buffer buff;
+	  buff.append (id, sizeof (uuid_t));
+	  buff.append (m_filename.c_str (), m_filename.size ());
+
+	  mftp::file instance (buff.data (), buff.size (), INSTANCE_TYPE);
+	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (instance, channel->get_handle(), false, 0));
 	}
       }
     }

@@ -21,6 +21,7 @@ AC_PROG_MAKE_SET
 
 # Checks for libraries.
 AC_SEARCH_LIBS([pthread_key_create], [pthread])
+AC_SEARCH_LIBS([uuid_generate], [uuid])
 
 # Checks for header files.
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/ioctl.h sys/socket.h sys/time.h unistd.h])

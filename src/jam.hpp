@@ -2,12 +2,14 @@
 #define __jam_hpp__
 
 #include <mftp/mftp.hpp>
+#include <uuid/uuid.h>
 
 namespace jam {
   
 #define FILE_TYPE 0
 #define META_TYPE 1
-#define QUERY_TYPE 2    
+#define QUERY_TYPE 2 
+#define INSTANCE_TYPE 3   
   
   const ioa::inet_address SEND_ADDR ("224.0.0.137", 54321);
   const ioa::inet_address LOCAL_ADDR ("0.0.0.0", 54321);
@@ -24,28 +26,38 @@ namespace jam {
     }
   };
     
-  struct meta_filename_predicate :
+  struct meta_inst_filename_predicate :
     public mftp::match_predicate
   {
     std::string filename;
     
-    meta_filename_predicate (const std::string& fname) :
+    meta_inst_filename_predicate (const std::string& fname) :
       filename (fname)
     { }
 
     bool operator() (const mftp::file& f) const {
-      assert (f.get_mfileid ().get_fileid ().type == META_TYPE);
-      if (f.get_mfileid ().get_original_length () >= sizeof (mftp::fileid)) {
-	// We have enough data.
-	// Get the name of the size.
-	const size_t size = f.get_mfileid ().get_original_length () - sizeof (mftp::fileid);
-	return memcmp (filename.c_str (), static_cast<const char*> (f.get_data_ptr ()) + sizeof (mftp::fileid), std::min (filename.size (), size)) == 0;
+      assert ((f.get_mfileid ().get_fileid ().type == META_TYPE) || (f.get_mfileid ().get_fileid ().type == INSTANCE_TYPE));
+      if (f.get_mfileid ().get_fileid ().type == META_TYPE) {
+	if (f.get_mfileid ().get_original_length () >= sizeof (mftp::fileid)) {
+	  // We have enough data.
+	  // Get the size of the name.
+	  const size_t size = f.get_mfileid ().get_original_length () - sizeof (mftp::fileid);
+	  return memcmp (filename.c_str (), static_cast<const char*> (f.get_data_ptr ()) + sizeof (mftp::fileid), std::min (filename.size (), size)) == 0;
+	}
+      }
+      else {  //an instance
+	if (f.get_mfileid ().get_original_length () >= sizeof (uuid_t)) {
+	  //We have enough data.
+	  const size_t size = f.get_mfileid ().get_original_length () - sizeof (uuid_t);
+	  return memcmp (filename.c_str (), static_cast<const char*> (f.get_data_ptr ()) + sizeof (mftp::fileid), std::min (filename.size (), size)) == 0;
+	}
+
       }
       return false;
     }
 
-    meta_filename_predicate* clone () const {
-      return new meta_filename_predicate (*this);
+    meta_inst_filename_predicate* clone () const {
+      return new meta_inst_filename_predicate (*this);
     }
 
   };
