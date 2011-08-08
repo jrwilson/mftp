@@ -507,7 +507,15 @@ namespace mftp {
   }
 
   bool mftp_automaton::fragment_count_precondition () const {
-    return !m_file.complete () && m_progress_threshold != 0 && m_fragments_since_report >= m_progress_threshold;
+    if (m_progress_threshold != 0) {
+      if (!m_file.complete () && m_fragments_since_report >= m_progress_threshold) {
+	return true;
+      }
+      else if (m_file.complete () && m_fragments_since_report != 0) {
+	return true;
+      }
+    }
+    return false;
   }
 
   uint32_t mftp_automaton::fragment_count_effect () {

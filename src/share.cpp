@@ -51,12 +51,20 @@ namespace jam {
 	  buff.append (m_sharename.c_str (), m_sharename.size ());
 
 	  mftp::file meta (buff.data (), buff.size (), META_TYPE);
+
+	  ioa::buffer buff2;
+	  buff2.append (m_sharename.c_str (), m_sharename.size ());
+
+	  mftp::file query (buff.data (), buff.size (), QUERY_TYPE);
 	
 	  // Create the file server.
 	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, channel->get_handle(), false, 0));
 	
 	  // Create the meta server.
-	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, channel->get_handle (), query_predicate (), query_filename_predicate (m_sharename), false, false, 0));
+	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta, channel->get_handle (), query_predicate (m_sharename), query_filename_predicate (m_sharename), false, false, 0));
+
+	  //Create a query server.
+	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (query, channel->get_handle (), query_predicate (m_sharename), query_filename_predicate (m_sharename), false, false, 0));
 
 	}
       }

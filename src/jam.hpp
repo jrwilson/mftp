@@ -14,15 +14,29 @@ namespace jam {
   const ioa::inet_address SEND_ADDR ("224.0.0.137", 54321);
   const ioa::inet_address LOCAL_ADDR ("0.0.0.0", 54321);
   
-  struct meta_predicate :
+  struct meta_inst_predicate :
     public mftp::match_candidate_predicate
   {
+    std::string filename;
+
+    meta_inst_predicate (const std::string& name) :
+      filename (name)
+    { }
+
     bool operator() (const mftp::fileid& fid) const {
-      return fid.type == META_TYPE;
+      if (fid.type == META_TYPE) {
+	return fid.length == sizeof (mftp::fileid) + filename.size ();
+      }
+      else if (fid.type == INSTANCE_TYPE) {
+	return fid.length == sizeof (uuid_t) + filename.size ();
+      }
+      else {
+	return false;
+      }
     }
 
-    meta_predicate* clone () const {
-      return new meta_predicate (*this);
+    meta_inst_predicate* clone () const {
+      return new meta_inst_predicate (*this);
     }
   };
     
@@ -36,22 +50,14 @@ namespace jam {
     { }
 
     bool operator() (const mftp::file& f) const {
-      assert ((f.get_mfileid ().get_fileid ().type == META_TYPE) || (f.get_mfileid ().get_fileid ().type == INSTANCE_TYPE));
       if (f.get_mfileid ().get_fileid ().type == META_TYPE) {
-	if (f.get_mfileid ().get_original_length () >= sizeof (mftp::fileid)) {
-	  // We have enough data.
-	  // Get the size of the name.
-	  const size_t size = f.get_mfileid ().get_original_length () - sizeof (mftp::fileid);
-	  return memcmp (filename.c_str (), static_cast<const char*> (f.get_data_ptr ()) + sizeof (mftp::fileid), std::min (filename.size (), size)) == 0;
-	}
-      }
+	// We have exactly the right amount of data!!!!!!!
+	// Get the size of the name.
+	return filename == std::string (static_cast<const char*> (f.get_data_ptr ()) + sizeof (mftp::fileid), filename.size ());
+      }      
       else {  //an instance
-	if (f.get_mfileid ().get_original_length () >= sizeof (uuid_t)) {
-	  //We have enough data.
-	  const size_t size = f.get_mfileid ().get_original_length () - sizeof (uuid_t);
-	  return memcmp (filename.c_str (), static_cast<const char*> (f.get_data_ptr ()) + sizeof (mftp::fileid), std::min (filename.size (), size)) == 0;
-	}
-
+	//We have the right amount of data.
+	return filename == std::string (static_cast<const char*> (f.get_data_ptr ()) + sizeof (uuid_t), filename.size ());
       }
       return false;
     }
@@ -65,8 +71,19 @@ namespace jam {
   struct query_predicate :
     public mftp::match_candidate_predicate
   {
+    std::string filename;
+
+    query_predicate (const std::string& name) :
+      filename (name)
+    { }
+
     bool operator() (const mftp::fileid& fid) const {
-      return fid.type == QUERY_TYPE;
+      if (fid.type == QUERY_TYPE) {
+	return fid.length == filename.size ();
+      }
+      else {
+	return false;
+      }
     }
 
     query_predicate* clone () const {
@@ -84,8 +101,7 @@ namespace jam {
     { }
 
     bool operator() (const mftp::file& f) const {
-      assert (f.get_mfileid ().get_fileid ().type == QUERY_TYPE);
-      return memcmp (filename.c_str (), f.get_data_ptr (), std::min (filename.size (), f.get_mfileid ().get_original_length ())) == 0;
+      return filename == std::string (static_cast<const char*> (f.get_data_ptr ()), filename.size ());
     }
 
     query_filename_predicate* clone () const {
