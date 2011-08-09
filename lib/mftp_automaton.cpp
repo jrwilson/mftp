@@ -5,12 +5,16 @@ namespace mftp {
   const ioa::time mftp_automaton::INIT_INTERVAL (1, 0); // 1 second
   const ioa::time mftp_automaton::MAX_INTERVAL (64, 0); // slightly over 1 minute
   const uint32_t mftp_automaton::MAX_FRAGMENT_COUNT (1); // Number of fragments allowed in sendq.
-  const uint32_t mftp_automaton::REREQUEST_NUMERATOR (4); // Send request when we have receive 80% of the previous request.
-  const uint32_t mftp_automaton::REREQUEST_DENOMINATOR (5);
-  const ioa::time mftp_automaton::REQUEST_INTERVAL (INIT_INTERVAL);
+  const uint32_t mftp_automaton::REREQUEST_NUMERATOR (9); // Send request when we have received this percentage of the previous request.  Reflects our assumption about the network.
+  const uint32_t mftp_automaton::REREQUEST_DENOMINATOR (10);
+  const ioa::time mftp_automaton::REQUEST_INTERVAL (INIT_INTERVAL); // Send a request using this frequency.
 
-  const uint32_t mftp_automaton::RATE_INCREASE_NUMERATOR (1); // Increase the request rate this must percent per second.
+  const uint32_t mftp_automaton::RATE_INCREASE_NUMERATOR (1); // Inflate the request rate by this percent.
   const uint32_t mftp_automaton::RATE_INCREASE_DENOMINATOR (100);
+
+  // Constants for exponentially weighted moving average.
+  const uint32_t mftp_automaton::RATE_ALPHA (4);
+  const uint32_t mftp_automaton::RATE_BETA (4);
 
   // Not matching.
   mftp_automaton::mftp_automaton (const file& file,
@@ -360,8 +364,7 @@ namespace mftp {
 	  if (!m_requests.empty () &&
 	      m->req.frags_per_second != 0) {
 	    if (m_target_send_frag_per_second != static_cast<uint32_t> (-1)) {
-	      // TODO:  Get rid of constants.
-	      m_target_send_frag_per_second = (m_target_send_frag_per_second * 4 + m->req.frags_per_second * 1) / 5;
+	      m_target_send_frag_per_second = (m_target_send_frag_per_second * RATE_ALPHA + m->req.frags_per_second * RATE_BETA) / (RATE_ALPHA + RATE_BETA);
 	    }
 	    else {
 	      m_target_send_frag_per_second = m->req.frags_per_second;
@@ -458,15 +461,8 @@ namespace mftp {
     assert (m_alarm_state == INTERRUPT_WAIT);
     m_alarm_state = SET_READY;
 
-    if (!(m_num_msg_in_last_interval > 0 &&
-	  m_num_msg_in_last_interval * RATE_INCREASE_NUMERATOR < RATE_INCREASE_DENOMINATOR)) {
-      m_target_msg_per_second = m_num_msg_in_last_interval + m_num_msg_in_last_interval * RATE_INCREASE_NUMERATOR / RATE_INCREASE_DENOMINATOR;
-    }
-    else {
-      // At least one.
-      m_target_msg_per_second += 1;
-    }
-
+    uint32_t increase = std::max (m_num_msg_in_last_interval * RATE_INCREASE_NUMERATOR / RATE_INCREASE_DENOMINATOR, 1u);
+    m_target_msg_per_second += increase;
     m_num_msg_in_last_interval = 0;
 
     send_announcement ();

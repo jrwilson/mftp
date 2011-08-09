@@ -36,6 +36,9 @@ namespace mftp {
 
     static const uint32_t RATE_INCREASE_NUMERATOR;
     static const uint32_t RATE_INCREASE_DENOMINATOR;
+
+    static const uint32_t RATE_ALPHA;
+    static const uint32_t RATE_BETA;
     
     ioa::handle_manager<mftp_automaton> m_self;
     file m_file;
