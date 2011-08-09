@@ -9,7 +9,7 @@ namespace mftp {
   const uint32_t REQUEST = 1;
   const uint32_t MATCH = 2;
 
-  const uint32_t SPANS_SIZE = 64;
+  const uint32_t SPANS_SIZE = 63;
   const uint32_t MATCHES_SIZE = 12;
 
   struct fragment
@@ -58,11 +58,13 @@ namespace mftp {
   struct request
   {
     fileid fid;
+    uint32_t frags_per_second;
     uint32_t span_count;
     span_t spans[SPANS_SIZE];
     
     void convert_to_network () {
       fid.convert_to_network ();
+      frags_per_second = htonl (frags_per_second);
       for (uint32_t i = 0; i < span_count; ++i) {
 	spans[i].convert_to_network ();
       }
@@ -71,6 +73,7 @@ namespace mftp {
     
     bool convert_to_host () {
       fid.convert_to_host ();
+      frags_per_second = ntohl (frags_per_second);
       span_count = ntohl (span_count);
       
       if (span_count == 0 || span_count > SPANS_SIZE) {
@@ -162,11 +165,13 @@ namespace mftp {
 
     message (request_type /* */,
 	     const fileid& fileid,
+	     uint32_t frags_per_second,
 	     uint32_t span_count,
 	     const span_t * spans)
     {
       header.message_type = REQUEST;
       req.fid = fileid;
+      req.frags_per_second = frags_per_second;
       req.span_count = span_count;
       for (uint32_t i = 0; i<span_count; i++){
 	req.spans[i] = spans[i];
@@ -231,9 +236,10 @@ namespace mftp {
 
     message_buffer (request_type type,
 		    const fileid& fileid,
+		    uint32_t frags_per_second,
 		    uint32_t span_count,
 		    const span_t * spans) :
-      msg (type, fileid, span_count, spans)
+      msg (type, fileid, frags_per_second, span_count, spans)
     { }
 
     message_buffer (match_type type,

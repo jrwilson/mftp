@@ -20,18 +20,22 @@ namespace mftp {
       SEND_COMPLETE_WAIT
     };
 
-    enum timer_state_t {
+    enum alarm_state_t {
       SET_READY,
       INTERRUPT_WAIT,
     };
 
-    static const ioa::time TIMER_INTERVAL;
+    static const ioa::time ALARM_INTERVAL;
     static const ioa::time INIT_INTERVAL;
     static const ioa::time MAX_INTERVAL;
     static const uint32_t MAX_FRAGMENT_COUNT;
+    static const ioa::time REQUEST_INTERVAL;
 
-    static const uint32_t REQUEST_NUMERATOR;
-    static const uint32_t REQUEST_DENOMINATOR;
+    static const uint32_t REREQUEST_NUMERATOR;
+    static const uint32_t REREQUEST_DENOMINATOR;
+
+    static const uint32_t RATE_INCREASE_NUMERATOR;
+    static const uint32_t RATE_INCREASE_DENOMINATOR;
     
     ioa::handle_manager<mftp_automaton> m_self;
     file m_file;
@@ -46,6 +50,7 @@ namespace mftp {
     uint32_t m_num_frag_in_sendq; // Number of fragments in the send queue.
     uint32_t m_num_req_in_sendq; // Number of requests in the send queue.
     uint32_t m_num_match_in_sendq; // Number of matches in the send queue.
+    uint32_t m_target_send_frag_per_second;
 
     // Answering requests.
     interval_set<uint32_t> m_requests; // Set of intervals indicating fragments that have been requested.
@@ -57,12 +62,15 @@ namespace mftp {
     ioa::time m_match_time; // Time when this automaton last received a match (of this file).
 
     // Periodic acitivities.
-    timer_state_t m_timer_state; // State of time state machine.
+    alarm_state_t m_alarm_state; // State of alarm state machine.
+    alarm_state_t m_fragment_alarm_state; // State of fragment alarm state machine.
     ioa::time m_announcement_interval; // Must wait this amount of time after m_fragment_time to send an announcement.
-    ioa::time m_request_interval; // Must wait this amount of time after m_request_time to send a request.
     ioa::time m_match_interval; // Must wait this amount of time after m_match_time to send a match.
 
     // Sending requests.
+    // TODO:  Message should be fragment.
+    uint32_t m_num_msg_in_last_interval; // Number of messages received in last interval.
+    uint32_t m_target_msg_per_second;  // Target number of messages per second.
     uint32_t m_num_frags_in_last_req; // Number of fragments in most recent request.
     uint32_t m_num_new_frags_since_req; // New fragments received since most recent request.
 
@@ -106,7 +114,7 @@ namespace mftp {
     void process_match_candidate (const file& f);
     message_buffer* get_fragment (uint32_t idx);
     void send_announcement ();
-    void send_request (bool reset);
+    void send_request ();
     void send_match (bool reset);
     void add_match (const fileid& fid);
 
@@ -120,16 +128,19 @@ namespace mftp {
     void receive_effect (const ioa::const_shared_ptr<message>& m);
     V_UP_INPUT (mftp_automaton, receive, ioa::const_shared_ptr<message>);
 
-    bool send_fragment_precondition () const;
-    void send_fragment_effect ();
-    UP_INTERNAL (mftp_automaton, send_fragment);
+    bool set_alarm_precondition () const;
+    ioa::time set_alarm_effect ();
+    V_UP_OUTPUT (mftp_automaton, set_alarm, ioa::time);
 
-    bool set_timer_precondition () const;
-    ioa::time set_timer_effect ();
-    V_UP_OUTPUT (mftp_automaton, set_timer, ioa::time);
+    void alarm_interrupt_effect ();
+    UV_UP_INPUT (mftp_automaton, alarm_interrupt);
 
-    void timer_interrupt_effect ();
-    UV_UP_INPUT (mftp_automaton, timer_interrupt);
+    bool set_fragment_alarm_precondition () const;
+    ioa::time set_fragment_alarm_effect ();
+    V_UP_OUTPUT (mftp_automaton, set_fragment_alarm, ioa::time);
+
+    void fragment_alarm_interrupt_effect ();
+    UV_UP_INPUT (mftp_automaton, fragment_alarm_interrupt);
 
     bool suicide_precondition () const;
     void suicide_effect ();
