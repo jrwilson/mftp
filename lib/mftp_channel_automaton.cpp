@@ -84,6 +84,7 @@ namespace mftp {
 
   void mftp_channel_automaton::send_effect (const ioa::const_shared_ptr<message_buffer>& message,
 					    ioa::aid_t aid) {
+    
     if (m_outgoing_set.count (aid) == 0 &&
 	m_pending_aid != aid &&
 	m_outgoing_completes.count (aid) == 0) {

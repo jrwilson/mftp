@@ -15,11 +15,6 @@ namespace mftp {
     public ioa::automaton
   {
   private:
-    static const ioa::time TIMER_INTERVAL;
-    static const ioa::time INIT_INTERVAL;
-    static const ioa::time MAX_INTERVAL;
-    static const size_t MAX_FRAGMENT_COUNT;
-
     enum send_state_t {
       SEND_READY,
       SEND_COMPLETE_WAIT
@@ -30,46 +25,64 @@ namespace mftp {
       INTERRUPT_WAIT,
     };
 
-    #define REQUEST_NUMERATOR 4
-    #define REQUEST_DENOMINATOR 5
+    static const ioa::time TIMER_INTERVAL;
+    static const ioa::time INIT_INTERVAL;
+    static const ioa::time MAX_INTERVAL;
+    static const uint32_t MAX_FRAGMENT_COUNT;
+
+    static const uint32_t REQUEST_NUMERATOR;
+    static const uint32_t REQUEST_DENOMINATOR;
     
     ioa::handle_manager<mftp_automaton> m_self;
     file m_file;
     const mfileid& m_mfileid;
     const fileid& m_fileid;
-    interval_set<uint32_t> m_requests; // Set of intervals indicating fragments that have been requested.
-    uint32_t m_last_sent_idx; // Index of last fragment sent.
+
+    ioa::handle_manager<mftp_channel_automaton> m_channel; // The channel for sending/receiving.
+
+    // Sending.
     std::queue<ioa::const_shared_ptr<message_buffer> > m_sendq; // Send queue.
     send_state_t m_send_state; // State of send state machine.
-    size_t m_fragment_count; // Number of fragments in the send queue.
-    ioa::time m_fragment_time; // Time when this automaton last received a fragment (of this file).
-    ioa::time m_request_time; // Time when this automaton last sent a request.
+    uint32_t m_num_frag_in_sendq; // Number of fragments in the send queue.
+    uint32_t m_num_req_in_sendq; // Number of requests in the send queue.
+    uint32_t m_num_match_in_sendq; // Number of matches in the send queue.
+
+    // Answering requests.
+    interval_set<uint32_t> m_requests; // Set of intervals indicating fragments that have been requested.
+    uint32_t m_last_sent_idx; // Index of last fragment sent.
+
+    // Timestamps for certain events.
+    ioa::time m_frag_recv_time; // Time when this automaton last received a fragment (of this file).
+    ioa::time m_request_time; // Time when this automaton last sent a request or received a new fragment.
     ioa::time m_match_time; // Time when this automaton last received a match (of this file).
+
+    // Periodic acitivities.
     timer_state_t m_timer_state; // State of time state machine.
     ioa::time m_announcement_interval; // Must wait this amount of time after m_fragment_time to send an announcement.
     ioa::time m_request_interval; // Must wait this amount of time after m_request_time to send a request.
     ioa::time m_match_interval; // Must wait this amount of time after m_match_time to send a match.
-    bool m_reported; // True when we have reported a complete download.
-    uint32_t m_last_request_size; // Number of fragments in most recent request.
-    uint32_t m_fragments_since_request; // Fragments received since most recent request.
 
-    ioa::handle_manager<mftp_channel_automaton> m_channel; // The channel for sending/receiving.
+    // Sending requests.
+    uint32_t m_num_frags_in_last_req; // Number of fragments in most recent request.
+    uint32_t m_num_new_frags_since_req; // New fragments received since most recent request.
 
+    // Reporting progress.
+    uint32_t m_fragments_since_report; // Number of fragments received since last progress report.
+    uint32_t m_progress_threshold; // Accumulate this many fragments before reporting progress.
+
+    // Matching.
     const bool m_matching; // Try to find matches for this file.
     std::auto_ptr<match_candidate_predicate> m_match_candidate_predicate;
     std::auto_ptr<match_predicate> m_match_predicate;
     const bool m_get_matching_files; // Always get matching files.
-
-    bool m_suicide_flag;  // Self-destruct when job is done.
-
     std::set<fileid> m_pending_matches; // Fileids that are pending a download for matching.
     std::set<fileid> m_matches; // Fileids that match.
     std::set<fileid> m_non_matches; // Fileids that don't match.
-
     std::queue<ioa::const_shared_ptr<file> > m_matching_files; // Queue of matching files.
 
-    uint32_t m_fragments_since_report; // Number of fragments received since last progress report.
-    uint32_t m_progress_threshold; // Accumulate this many fragments before reporting progress.
+    // Termination.
+    bool m_suicide_flag;  // Self-destruct when job is done.
+    bool m_reported; // True when we have reported a complete download.
 
   public:
     // Not matching.

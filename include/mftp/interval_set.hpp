@@ -94,6 +94,11 @@ public:
 public:
   static bool intersect (const interval_type& x,
 			 const interval_type& y) {
+    return std::max (x.first, y.first) < std::min (x.second, y.second);
+  } 
+
+  static bool touch (const interval_type& x,
+			 const interval_type& y) {
     return std::max (x.first, y.first) <= std::min (x.second, y.second);
   } 
 
@@ -105,26 +110,15 @@ public:
 	return m_set.insert (x);
       }
 
-      iterator pos = m_set.lower_bound (x);
-      if (pos == m_set.end ()) {
-	--pos;
-      }
-      if (!intersect (*pos, x)) {
+      iterator pos = find_first_touch (x);
+      if (pos == end ()) {
 	//nothing intersects x
 	return m_set.insert (x);
       }
-      if (pos != m_set.begin ()) {
-	iterator it = pos;
-	--it;
 
-	if (intersect (*it, x)) {
-	  pos = it;
-	}
-      }
-
-      const Key alpha = std::min (x.first, pos->first); 
+      const Key alpha = std::min (x.first, pos->first);
       Key beta = pos->second;
-      while (pos != m_set.end () && intersect (*pos, x)) {
+      while (pos != m_set.end () && touch (*pos, x)) {
 	beta = pos->second;
 	m_set.erase (pos++);
       }
@@ -152,18 +146,9 @@ public:
       if (empty ()) {
 	return 0;
       }
-      iterator pos = m_set.lower_bound (k);
-      if (pos != m_set.begin ()) {
-	iterator it = pos;
-	--it;
-	
-	if (intersect (*it, k)) {
-	  pos = it;
-	}
-      }
 
-      if (pos == m_set.end () || !intersect (*pos, k)) {
-	//nothing intersects k
+      iterator pos = find_first_intersect (k);
+      if (pos == end ()) {
 	return 0;
       }
 
@@ -209,7 +194,6 @@ public:
   equal_range (const key_type& k) const {
     return m_set.equal_range (k);
   }
-
   
   bool operator== (const interval_set& y) const {
     return m_set == y.m_set;
@@ -218,6 +202,42 @@ public:
   
   bool operator< (const interval_set& y) const {
     return m_set < y.m_set;
+  }
+
+  iterator find_first_intersect (const key_type& k) const {
+    const_iterator after = lower_bound (k);
+    const_iterator before = after;
+    if (before != begin ()) {
+      --before;
+    }
+
+    if (before != end () && intersect (*before, k)) {
+      return before;
+    }
+    else if (after != end () && intersect (*after, k)) {
+      return after;
+    }
+    else {
+      return end ();
+    }
+  }
+
+  iterator find_first_touch (const key_type& k) const {
+    const_iterator after = lower_bound (k);
+    const_iterator before = after;
+    if (before != begin ()) {
+      --before;
+    }
+
+    if (before != end () && touch (*before, k)) {
+      return before;
+    }
+    else if (after != end () && touch (*after, k)) {
+      return after;
+    }
+    else {
+      return end ();
+    }
   }
   
 };

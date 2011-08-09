@@ -14,7 +14,6 @@ namespace mftp {
     mfileid m_mfileid;
     uint8_t* m_data;
     uint32_t m_have_count;
-    uint32_t m_start_idx;
 
   public:
     file (const std::string&,
@@ -32,10 +31,9 @@ namespace mftp {
     uint32_t have_count () const;
     bool complete () const;
     bool empty () const;
-    bool write_chunk (const uint32_t offset,
+    bool write_chunk (const uint32_t idx,
 		      const void* data);
-    std::pair<uint32_t, uint32_t> get_next_range ();
-    uint32_t get_random_index () const;
+    uint32_t get_first_fragment_index () const;
   };
 }
 

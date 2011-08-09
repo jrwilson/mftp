@@ -15,20 +15,20 @@ namespace mftp {
   struct fragment
   {
     fileid fid;
-    uint32_t offset;
+    uint32_t idx;
     uint8_t data[FRAGMENT_SIZE];
 
     void convert_to_network () {
       fid.convert_to_network ();
-      offset = htonl (offset);
+      idx = htonl (idx);
     }
 
     bool convert_to_host () {
       fid.convert_to_host ();
-      offset = ntohl (offset);
+      idx = ntohl (idx);
 
       mfileid mid (fid);
-      return ((offset % FRAGMENT_SIZE) == 0) && (offset < mid.get_final_length ());
+      return idx < mid.get_fragment_count ();
     }
   };
 
@@ -82,9 +82,7 @@ namespace mftp {
 	spans[i].convert_to_host ();
 	
 	if (!((spans[i].start < spans[i].stop) &&
-	      (spans[i].stop <= mid.get_final_length () ) &&
-	      (spans[i].start % FRAGMENT_SIZE == 0) &&
-	      (spans[i].stop % FRAGMENT_SIZE == 0) )) {
+	      (spans[i].stop <= mid.get_fragment_count ()))) {
 	  return false;
 	}
       }
@@ -153,12 +151,12 @@ namespace mftp {
 
     message (fragment_type /* */,
 	     const fileid& fileid,
-	     uint32_t offset,
+	     uint32_t idx,
 	     const void* data)
     {
       header.message_type = FRAGMENT;
       frag.fid = fileid;
-      frag.offset = offset;
+      frag.idx = idx;
       memcpy (frag.data, data, FRAGMENT_SIZE);
     }
 
@@ -226,9 +224,9 @@ namespace mftp {
 
     message_buffer (fragment_type type,
 		    const fileid& fileid,
-		    uint32_t offset,
+		    uint32_t idx,
 		    const void* data) :
-      msg (type, fileid, offset, data)
+      msg (type, fileid, idx, data)
     { }
 
     message_buffer (request_type type,

@@ -4,6 +4,7 @@
 #include <list>
 #include <algorithm>
 #include <iostream>
+#include <vector>
 
 static const char* default_ctor () {
   std::cout << __func__ << std::endl;
@@ -417,6 +418,69 @@ static const char* erase_triple_intersect12 () {
   return 0;  
 }
 
+static const char* erase () {
+  std::cout << __func__ << std::endl;
+  
+  interval_set<int> tr;
+  std::vector<bool> q (100);
+
+  for (int round = 0; round < 1000; ++round) {
+    int low = rand () % 100;
+    int high = rand () % 100;
+
+    if (high < low) {
+      int tmp = low;
+      low = high;
+      high = tmp;
+    }
+
+    interval_set<int>::interval_type interval (low, high);
+
+    if (rand () % 2 == 0) {
+      std::cout << "insert [" << interval.first << "," << interval.second << ")" << std::endl;
+      tr.insert (interval);
+      for (int i = low; i < high; ++i) {
+	q[i] = true;
+      }
+    }
+    else {
+      std::cout << "erase [" << interval.first << "," << interval.second << ")" << std::endl;
+      tr.erase (interval);
+      for (int i = low; i < high; ++i) {
+	q[i] = false;
+      }
+    }
+
+    for (interval_set<int>::const_iterator pos = tr.begin ();
+	 pos != tr.end ();
+	 ++pos) {
+      interval_set<int>::const_iterator nxt = pos;
+      ++nxt;
+      if (nxt != tr.end ()) {
+	mu_assert (!interval_set<int>::touch (*pos, *nxt));
+      }
+
+      std::cout << "[" << pos->first << "," << pos->second << ") ";
+      for (int i = pos->first; i < pos->second; ++i) {
+	mu_assert (q[i]);
+      }
+    }
+    std::cout << std::endl;
+
+    for (int i = 0; i < 100; ++i) {
+      if (q[i]) {
+	mu_assert (tr.find_first_intersect (std::make_pair (i, i + 1)) != tr.end ());
+      }
+      else {
+	mu_assert (tr.find_first_intersect (std::make_pair (i, i + 1)) == tr.end ());
+      }
+    }
+
+  }
+
+  return 0;  
+}
+
 const char* all_tests () {
   mu_run_test (default_ctor);
   mu_run_test (insert_single);
@@ -445,6 +509,8 @@ const char* all_tests () {
   mu_run_test (erase_triple_intersect);
   mu_run_test (erase_triple_overlap);
   mu_run_test (erase_triple_intersect12);
+
+  mu_run_test (erase);
 
   return 0;
 }
