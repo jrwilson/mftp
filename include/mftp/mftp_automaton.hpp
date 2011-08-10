@@ -29,13 +29,6 @@ namespace mftp {
     static const ioa::time INIT_INTERVAL;
     static const ioa::time MAX_INTERVAL;
     static const uint32_t MAX_FRAGMENT_COUNT;
-    static const ioa::time REQUEST_INTERVAL;
-
-    static const uint32_t REREQUEST_NUMERATOR;
-    static const uint32_t REREQUEST_DENOMINATOR;
-
-    static const uint32_t RATE_INCREASE_NUMERATOR;
-    static const uint32_t RATE_INCREASE_DENOMINATOR;
 
     ioa::handle_manager<mftp_automaton> m_self;
     file m_file;
@@ -57,7 +50,6 @@ namespace mftp {
 
     // Timestamps for certain events.
     ioa::time m_frag_recv_time; // Time when this automaton last received a fragment (of this file).
-    ioa::time m_request_time; // Time when this automaton last sent a request or received a new fragment.
     ioa::time m_match_time; // Time when this automaton last received a match (of this file).
 
     // Periodic acitivities.
