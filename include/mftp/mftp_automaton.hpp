@@ -37,9 +37,6 @@ namespace mftp {
     static const uint32_t RATE_INCREASE_NUMERATOR;
     static const uint32_t RATE_INCREASE_DENOMINATOR;
 
-    static const uint32_t RATE_ALPHA;
-    static const uint32_t RATE_BETA;
-    
     ioa::handle_manager<mftp_automaton> m_self;
     file m_file;
     const mfileid& m_mfileid;
@@ -53,7 +50,6 @@ namespace mftp {
     uint32_t m_num_frag_in_sendq; // Number of fragments in the send queue.
     uint32_t m_num_req_in_sendq; // Number of requests in the send queue.
     uint32_t m_num_match_in_sendq; // Number of matches in the send queue.
-    uint32_t m_target_send_frag_per_second;
 
     // Answering requests.
     interval_set<uint32_t> m_requests; // Set of intervals indicating fragments that have been requested.
@@ -71,9 +67,6 @@ namespace mftp {
     ioa::time m_match_interval; // Must wait this amount of time after m_match_time to send a match.
 
     // Sending requests.
-    // TODO:  Message should be fragment.
-    uint32_t m_num_msg_in_last_interval; // Number of messages received in last interval.
-    uint32_t m_target_msg_per_second;  // Target number of messages per second.
     uint32_t m_num_frags_in_last_req; // Number of fragments in most recent request.
     uint32_t m_num_new_frags_since_req; // New fragments received since most recent request.
 

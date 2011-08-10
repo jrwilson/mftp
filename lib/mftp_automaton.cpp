@@ -12,10 +12,6 @@ namespace mftp {
   const uint32_t mftp_automaton::RATE_INCREASE_NUMERATOR (1); // Inflate the request rate by this percent.
   const uint32_t mftp_automaton::RATE_INCREASE_DENOMINATOR (100);
 
-  // Constants for exponentially weighted moving average.
-  const uint32_t mftp_automaton::RATE_ALPHA (4);
-  const uint32_t mftp_automaton::RATE_BETA (4);
-
   // Not matching.
   mftp_automaton::mftp_automaton (const file& file,
 				  const ioa::automaton_handle<mftp_channel_automaton>& channel,
@@ -30,14 +26,11 @@ namespace mftp {
     m_num_frag_in_sendq (0),
     m_num_req_in_sendq (0),
     m_num_match_in_sendq (0),
-    m_target_send_frag_per_second (-1),
     m_last_sent_idx (rand () % m_mfileid.get_fragment_count ()),
     m_alarm_state (SET_READY),
     m_fragment_alarm_state (SET_READY),
     m_announcement_interval (INIT_INTERVAL),
     m_match_interval (INIT_INTERVAL),
-    m_num_msg_in_last_interval (0),
-    m_target_msg_per_second (0),
     m_num_frags_in_last_req (0),
     m_num_new_frags_since_req (0),
     m_fragments_since_report (0),
@@ -67,14 +60,11 @@ namespace mftp {
     m_num_frag_in_sendq (0),
     m_num_req_in_sendq (0),
     m_num_match_in_sendq (0),
-    m_target_send_frag_per_second (-1),
     m_last_sent_idx (rand () % m_mfileid.get_fragment_count ()),
     m_alarm_state (SET_READY),
     m_fragment_alarm_state (SET_READY),
     m_announcement_interval (INIT_INTERVAL),
     m_match_interval (INIT_INTERVAL),
-    m_num_msg_in_last_interval (0),
-    m_target_msg_per_second (0),
     m_num_frags_in_last_req (0),
     m_num_new_frags_since_req (0),
     m_fragments_since_report (0),
@@ -203,7 +193,7 @@ namespace mftp {
 	  ++pos;
 	}
 
-	message_buffer* m = new message_buffer (request_type (), m_fileid, m_target_msg_per_second, span_count, spans);
+	message_buffer* m = new message_buffer (request_type (), m_fileid, span_count, spans);
 	m->convert_to_network ();
 	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
 	++m_num_req_in_sendq;
@@ -304,7 +294,6 @@ namespace mftp {
 		// Accounting.
 		++m_num_new_frags_since_req;
 		++m_fragments_since_report;
-		++m_num_msg_in_last_interval;
 		// Reset the request interval.
 		send_request ();
 	      }
@@ -359,16 +348,6 @@ namespace mftp {
 	       pos != m_file.m_dont_have.end ();
 	       ++pos) {
 	    m_requests.erase (*pos);
-	  }
-
-	  if (!m_requests.empty () &&
-	      m->req.frags_per_second != 0) {
-	    if (m_target_send_frag_per_second != static_cast<uint32_t> (-1)) {
-	      m_target_send_frag_per_second = (m_target_send_frag_per_second * RATE_ALPHA + m->req.frags_per_second * RATE_BETA) / (RATE_ALPHA + RATE_BETA);
-	    }
-	    else {
-	      m_target_send_frag_per_second = m->req.frags_per_second;
-	    }
 	  }
 	}
       }
@@ -461,10 +440,6 @@ namespace mftp {
     assert (m_alarm_state == INTERRUPT_WAIT);
     m_alarm_state = SET_READY;
 
-    uint32_t increase = std::max (m_num_msg_in_last_interval * RATE_INCREASE_NUMERATOR / RATE_INCREASE_DENOMINATOR, 1u);
-    m_target_msg_per_second += increase;
-    m_num_msg_in_last_interval = 0;
-
     send_announcement ();
     send_request ();
     send_match (false);
@@ -477,12 +452,8 @@ namespace mftp {
   ioa::time mftp_automaton::set_fragment_alarm_effect () {
     m_fragment_alarm_state = INTERRUPT_WAIT;
     
-    if (m_target_send_frag_per_second != static_cast<uint32_t> (-1)) {
-      return ioa::time ();
-    }
-    else {
-      return ioa::time (0, 1000000 / m_target_send_frag_per_second);
-    }
+    // TODO:  Fix this.
+    return ioa::time (0, 1000);
   }
 
   void mftp_automaton::fragment_alarm_interrupt_effect () {
@@ -512,10 +483,6 @@ namespace mftp {
       m->convert_to_network ();
       m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
       ++m_num_frag_in_sendq;
-      
-      if (m_requests.empty ()) {
-	m_target_send_frag_per_second = -1;
-      }
     }
   }  
 
