@@ -3,11 +3,11 @@ AM_CXXFLAGS = -Wall -I$(top_srcdir)/include
 LDADD = -lioa $(top_builddir)/lib/libmftp.la
 
 bin_PROGRAMS = \
-describe \
-get
+get \
+share
 
 noinst_PROGRAMS = \
-share \
+describe \
 specify \
 udp_receiver \
 udp_sender
