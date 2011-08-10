@@ -13,31 +13,6 @@
 The abstract abstract.
 \end{abstract}
 
-\section{Adam's Section}
-A couple of things were hard to digest, the first of which being indirect triggers.  
-It's hard to swallow the idea that you can queue an action but it's time of execution is far from guaranteed.  
-The second hardest thing was simply the intimidation factor of realizing your entire summer would be working with an unknown, rather large library that nobody but the creator had used before--which was modelled after a complicated formalism I had never heard of that no one had bothered to fully develop since its inception.  
-That's quite the pill to swallow.
-
-An thing that I learned was easy was to model the automata very closely to Lynch's design.  
-It was much easier for me to learn the relationship between the formalism and the code by looking at well-modelled automata, so the same would extend onto someone looking at the formalism and our code. 
-Maintaining this allows for a less steep learning curve, and hopefully contributes to the automata maintaining their structural integrity as more people use the library.
-
-It's hard to describe what is ``harder'' to implement using I/O Automata.  
-Though I/O Automata present a \emph{different} problem set than using threads, the resulting problem set is respectively easier and more intuitive to handle.  
-
-However, what is easer to implement is much more plentiful.
-The design and debugging of the program is much more intuitive.
-It allowed for a high degree of abstraction, which is key for easily-understandable code.
-It allowed \emph{extremely} easy refactoring of any class when compared to the alleged dregs of refactoring a thread-intensive class.
-
-In regards to building a protocol, I learned that it is extremely helpful to add and then test small bits of functionality at a time, in order to get a small working product.
-Once this is complete, repeat by adding or extending the functionality.
-Though this may seem trivial, calculated baby-steps made developing a protocol seem much easier than trying it all at once.
-
-\section{Magnum Albatross}
-The most challenging part of learning to work with I/O Automata was to think of the \"events\" in the system not as interrupts that immediately trigger an action, but rather as transitions that change the state of the automaton to enable and disable other actions.
-
 
 \section{Introduction}
 The proliferation of embedded networking is transforming homes into distributed computing environments.
@@ -215,6 +190,34 @@ Using the file IDs contained in the meta files, Get constructs further MFTP auto
   \includegraphics[scale=0.65]{get_diagram}
   \caption{The get program \label{EvalutationTwo}}
 \end{figure}
+
+\section{Adam's Section}
+%% Go into more detail / provide more examples
+A couple of things were hard to digest, the first of which being indirect triggers.  
+It's hard to swallow the idea that you can queue an action but it's time of execution is far from guaranteed.  
+The second hardest thing was simply the intimidation factor of realizing your entire summer would be working with an unknown, rather large library that nobody but the creator had used before--which was modelled after a complicated formalism I had never heard of that no one had bothered to fully develop since its inception.  
+That's quite the pill to swallow.
+
+One thing that I learned was easy was to model the automata very closely to Lynch's design.  
+It was much easier for me to learn the relationship between the formalism and the code by looking at well-modelled automata, so the same would extend onto someone looking at the formalism and our code. 
+Maintaining this allows for a less steep learning curve, and hopefully contributes to the automata maintaining their structural integrity as more people use the library.
+An example of this would be correctly classifying input, output, and internal actions.
+
+It's hard to describe what is ``harder'' to implement using I/O Automata.  
+Though I/O Automata present a \emph{different} problem set than using threads, the resulting problem set is respectively easier and more intuitive to handle.  
+
+However, what is easer to implement is much more plentiful.
+The design and debugging of the program is much more intuitive.
+It allowed for a high degree of abstraction, which is key for easily-understandable code.
+It allowed \emph{extremely} easy refactoring of any class when compared to the alleged dregs of refactoring a thread-intensive class.
+
+In regards to building a protocol, I learned that it is extremely helpful to add and then test small bits of functionality at a time, in order to get a small working product.
+Once this is complete, repeat by adding or extending the functionality.
+Though this may seem trivial, calculated baby-steps made developing a protocol seem much easier than trying it all at once.
+For example, developing a simple transfer channel to correctly model our mftp automaton.  After this was well tested, we then moved it to transfer over multicast/broadcast.
+
+\section{Magnum Albatross}
+The most challenging part of learning to work with I/O Automata was to think of the \"events\" in the system not as interrupts that immediately trigger an action, but rather as transitions that change the state of the automaton to enable and disable other actions.
 
 \section{Related Work}
 
