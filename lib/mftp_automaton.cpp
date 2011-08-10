@@ -167,7 +167,6 @@ namespace mftp {
 	// Increase the interval.
 	m_request_interval += m_request_interval;
 	m_request_interval = std::min (m_request_interval, MAX_INTERVAL);
-	std::cout << "Timeout" << std::endl;
       }
 
       if (timeout || percent) {
