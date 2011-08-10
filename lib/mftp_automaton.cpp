@@ -141,9 +141,7 @@ namespace mftp {
       const ioa::time now = ioa::time::now ();
       if (m_frag_recv_time + m_announcement_interval <= now) {
 	// Send a fragment.
-	message_buffer* m = get_fragment (m_file.get_first_fragment_index ());
-	m->convert_to_network ();
-	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+	m_sendq.push (ioa::const_shared_ptr<std::string> (get_fragment (m_file.get_first_fragment_index ())));
 	++m_num_frag_in_sendq;
 	m_announcement_interval += m_announcement_interval;
 	m_announcement_interval = std::min (m_announcement_interval, MAX_INTERVAL);
@@ -176,13 +174,13 @@ namespace mftp {
 	}
 
 	std::set<uint32_t> frags;
-	uint32_t fragments[REQUEST_SIZE];
+	message m (request_type (), m_fileid);
 
 	uint32_t idx = 0;
 	while (idx < REQUEST_SIZE) {
 	  if (interval_set<uint32_t>::intersect (*pos, std::make_pair (m_request_idx, m_request_idx + 1))) {
 	    frags.insert (m_request_idx);
-	    fragments[idx++] = m_request_idx++;
+	    m.req.fragments[idx++] = m_request_idx++;
 	  }
 	  else {
 	    ++pos;
@@ -195,9 +193,8 @@ namespace mftp {
 
 	m_last_request_size = frags.size ();
 
-	message_buffer* m = new message_buffer (request_type (), m_fileid, fragments);
-	m->convert_to_network ();
-	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+	m.convert_to_network ();
+	m_sendq.push (ioa::const_shared_ptr<std::string> (new std::string (reinterpret_cast<char *> (&m), sizeof (m))));
 	++m_num_req_in_sendq;
 
 	// Reset.
@@ -230,17 +227,14 @@ namespace mftp {
 	// Create match messages.
 	std::set<fileid>::const_iterator pos = m_matches.begin ();
 	while (pos != m_matches.end ()) {
-	  uint32_t count = 0;
-	  fileid matches[MATCHES_SIZE];
-	  while (count < MATCHES_SIZE && pos != m_matches.end ()) {
-	    matches[count] = *pos;
+	  message m (match_type (), m_fileid);
+	  while (m.mat.match_count < MATCHES_SIZE && pos != m_matches.end ()) {
+	    m.mat.matches[m.mat.match_count++] = *pos;
 	    ++pos;
-	    ++count;
 	  }
 
-	  message_buffer* m = new message_buffer (match_type (), m_fileid, count, matches);
-	  m->convert_to_network ();
-	  m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+	  m.convert_to_network ();
+	  m_sendq.push (ioa::const_shared_ptr<std::string> (new std::string (reinterpret_cast<char *> (&m), sizeof (m))));
 	  ++m_num_match_in_sendq;
 	}
       }
@@ -258,10 +252,11 @@ namespace mftp {
     return !m_sendq.empty () && m_send_state == SEND_READY && ioa::binding_count (&mftp_automaton::send) != 0;
   }
 
-  ioa::const_shared_ptr<message_buffer> mftp_automaton::send_effect () {
-    ioa::const_shared_ptr<message_buffer> m = m_sendq.front ();
+  ioa::const_shared_ptr<std::string> mftp_automaton::send_effect () {
+    ioa::const_shared_ptr<std::string> m = m_sendq.front ();
     m_sendq.pop ();
-    switch (ntohl (m->msg.header.message_type)) {
+    const message* msg = reinterpret_cast<const message*> (m->data ());
+    switch (ntohl (msg->header.message_type)) {
     case FRAGMENT:
       --m_num_frag_in_sendq;
       break;
@@ -475,9 +470,7 @@ namespace mftp {
       m_requests_set.erase (pos);
       
       // Get the fragment for that index.
-      message_buffer* m = get_fragment (idx);
-      m->convert_to_network ();
-      m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+      m_sendq.push (ioa::const_shared_ptr<std::string> (get_fragment (idx)));
       ++m_num_frag_in_sendq;
     }
   }
@@ -532,8 +525,10 @@ namespace mftp {
     return f;
   }
 
-  message_buffer* mftp_automaton::get_fragment (uint32_t idx) {
-    return new message_buffer (fragment_type (), m_fileid, idx, static_cast<const char*> (m_file.get_data_ptr ()) + idx * FRAGMENT_SIZE);
+  std::string* mftp_automaton::get_fragment (uint32_t idx) {
+    message m (fragment_type (), m_fileid, idx, static_cast<const char*> (m_file.get_data_ptr ()) + idx * FRAGMENT_SIZE);
+    m.convert_to_network ();
+    return new std::string (reinterpret_cast<char*> (&m), sizeof (m));
   }
 
   bool mftp_automaton::fragment_count_precondition () const {

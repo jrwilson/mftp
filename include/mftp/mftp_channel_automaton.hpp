@@ -15,7 +15,7 @@ namespace mftp {
   {
   private:
     ioa::handle_manager<mftp_channel_automaton> m_self;
-    typedef std::pair<ioa::const_shared_ptr<message_buffer>, ioa::aid_t> message_aid;
+    typedef std::pair<ioa::const_shared_ptr<std::string>, ioa::aid_t> message_aid;
     std::list<message_aid > m_outgoing_messages;
     std::set<ioa::aid_t> m_outgoing_set;
     ioa::aid_t m_pending_aid;
@@ -44,10 +44,10 @@ namespace mftp {
     void observe (ioa::observable* o);
     void purge (const ioa::aid_t aid);
 
-    void send_effect (const ioa::const_shared_ptr<message_buffer>& message,
+    void send_effect (const ioa::const_shared_ptr<std::string>& message,
 		      ioa::aid_t aid);
   public:
-    V_AP_INPUT (mftp_channel_automaton, send, ioa::const_shared_ptr<message_buffer>);
+    V_AP_INPUT (mftp_channel_automaton, send, ioa::const_shared_ptr<std::string>);
 
   private:
     bool send_out_precondition () const;

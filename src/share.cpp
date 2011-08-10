@@ -46,14 +46,14 @@ namespace jam {
 	  mftp::fileid copy = file.get_mfileid ().get_fileid ();
 	  copy.convert_to_network ();
 
-	  ioa::buffer buff;
-	  buff.append (&copy, sizeof (mftp::fileid));
+	  std::string buff;
+	  buff.append (reinterpret_cast<char *> (&copy), sizeof (mftp::fileid));
 	  buff.append (m_sharename.c_str (), m_sharename.size ());
 
 	  mftp::file meta (buff.data (), buff.size (), META_TYPE);
 
-	  ioa::buffer buff2;
-	  buff2.append (m_sharename.c_str (), m_sharename.size ());
+	  std::string buff2;
+	  buff2.append (m_sharename);
 
 	  mftp::file query (buff.data (), buff.size (), QUERY_TYPE);
 	

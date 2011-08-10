@@ -2,7 +2,6 @@
 #define __message_hpp__
 
 #include <mftp/mfileid.hpp>
-#include <ioa/buffer.hpp>
 
 namespace mftp {
   const uint32_t FRAGMENT = 0;
@@ -130,28 +129,18 @@ namespace mftp {
     }
 
     message (request_type /* */,
-	     const fileid& fileid,
-	     const uint32_t* fragments)
+	     const fileid& fileid)
     {
       header.message_type = REQUEST;
       req.fid = fileid;
-      for (uint32_t i = 0; i < REQUEST_SIZE; i++){
-	req.fragments[i] = fragments[i];
-      }
     }
 
     message (match_type /* */,
-	     const fileid& fid,
-	     uint32_t match_count,
-	     const fileid * matches)
+	     const fileid& fid)
     {
       header.message_type = MATCH;
       mat.fid = fid;
-      mat.match_count = match_count;
-      for (uint32_t i = 0; i < match_count; i++) {
-	mat.matches[i] = matches[i];
-      }
-
+      mat.match_count = 0;
     }
 
     void convert_to_network () {
@@ -184,47 +173,6 @@ namespace mftp {
     }
   };
 
-  struct message_buffer :
-    public ioa::buffer_interface
-  {
-    message msg;
-
-    message_buffer (fragment_type type,
-		    const fileid& fileid,
-		    uint32_t idx,
-		    const void* data) :
-      msg (type, fileid, idx, data)
-    { }
-
-    message_buffer (request_type type,
-		    const fileid& fileid,
-		    const uint32_t* fragments) :
-      msg (type, fileid, fragments)
-    { }
-
-    message_buffer (match_type type,
-		    const fileid& fid,
-		    uint32_t match_count,
-		    const fileid * matches) :
-      msg (type, fid, match_count, matches)
-    { }
-
-    const void* data () const {
-      return &msg;
-    }
-
-    size_t size () const {
-      return sizeof (message);
-    }
-
-    void convert_to_network () {
-      msg.convert_to_network ();
-    }
-
-    void convert_to_host () {
-      msg.convert_to_host ();
-    }
-  };
 }
 
 #endif

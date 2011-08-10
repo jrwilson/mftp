@@ -27,7 +27,7 @@ private:
   const ioa::time m_interval;
   const uint32_t m_message_size;
   uint32_t m_message_count;
-  std::queue<ioa::const_shared_ptr<ioa::buffer> > m_sendq;
+  std::queue<ioa::const_shared_ptr<std::string> > m_sendq;
 
 public:
   udp_sender (const ioa::inet_address& address,
@@ -87,11 +87,12 @@ private:
   V_UP_OUTPUT (udp_sender, set_alarm, ioa::time);
 
   void alarm_interrupt_effect () {
-    ioa::buffer* buf = new ioa::buffer (m_message_size);
-    uint32_t t = htonl (m_message_count--);
-    memcpy (buf->data (), &t, sizeof (t));
     m_alarm_state = ALARM_SET;
-    m_sendq.push (ioa::const_shared_ptr<ioa::buffer> (buf));
+
+    uint32_t t = htonl (m_message_count--);
+    std::string* buf = new std::string (reinterpret_cast<char *> (&t), sizeof (t));
+    buf->append ('\0', m_message_size - sizeof (t));
+    m_sendq.push (ioa::const_shared_ptr<std::string> (buf));
     if (m_sendq.size () > 1) {
       std::cout << "Queuing: " << m_sendq.size () << std::endl;
     }
@@ -105,7 +106,7 @@ private:
 
   ioa::udp_sender_automaton::send_arg send_effect () {
     m_send_state = SEND_WAIT;
-    ioa::const_shared_ptr<ioa::buffer> m = m_sendq.front ();
+    ioa::const_shared_ptr<std::string> m = m_sendq.front ();
     m_sendq.pop ();
     return ioa::udp_sender_automaton::send_arg (m_address, m);
   }

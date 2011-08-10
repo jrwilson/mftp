@@ -40,7 +40,7 @@ namespace mftp {
     ioa::handle_manager<mftp_channel_automaton> m_channel; // The channel for sending/receiving.
 
     // Sending.
-    std::queue<ioa::const_shared_ptr<message_buffer> > m_sendq; // Send queue.
+    std::queue<ioa::const_shared_ptr<std::string> > m_sendq; // Send queue.
     send_state_t m_send_state; // State of send state machine.
     uint32_t m_num_frag_in_sendq; // Number of fragments in the send queue.
     uint32_t m_num_req_in_sendq; // Number of requests in the send queue.
@@ -105,15 +105,15 @@ namespace mftp {
     void create_bindings ();
     void schedule () const;
     void process_match_candidate (const file& f);
-    message_buffer* get_fragment (uint32_t idx);
+    std::string* get_fragment (uint32_t idx);
     void send_announcement ();
     void send_request ();
     void send_match (bool reset);
     void add_match (const fileid& fid);
 
     bool send_precondition () const;
-    ioa::const_shared_ptr<message_buffer> send_effect ();
-    V_UP_OUTPUT (mftp_automaton, send, ioa::const_shared_ptr<message_buffer>);
+    ioa::const_shared_ptr<std::string> send_effect ();
+    V_UP_OUTPUT (mftp_automaton, send, ioa::const_shared_ptr<std::string>);
 
     void send_complete_effect ();
     UV_UP_INPUT (mftp_automaton, send_complete);

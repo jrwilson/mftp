@@ -82,7 +82,7 @@ namespace mftp {
     m_outgoing_completes.erase (aid);
   }
 
-  void mftp_channel_automaton::send_effect (const ioa::const_shared_ptr<message_buffer>& message,
+  void mftp_channel_automaton::send_effect (const ioa::const_shared_ptr<std::string>& message,
 					    ioa::aid_t aid) {
     
     if (m_outgoing_set.count (aid) == 0 &&

@@ -4,7 +4,9 @@ LDADD = -lioa $(top_builddir)/lib/libmftp.la
 
 bin_PROGRAMS = \
 describe \
-get \
+get
+
+noinst_PROGRAMS = \
 share \
 specify \
 udp_receiver \

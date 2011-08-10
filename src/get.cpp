@@ -48,8 +48,8 @@ namespace jam {
 	  //Create the instance server.
 	  uuid_t id;
 	  uuid_generate (id);
-	  ioa::buffer buff;
-	  buff.append (id, sizeof (uuid_t));
+	  std::string buff;
+	  buff.append (reinterpret_cast<char*> (id), sizeof (uuid_t));
 	  buff.append (m_filename.c_str (), m_filename.size ());
 
 	  mftp::file f (buff.data (), buff.size (), QUERY_TYPE);
