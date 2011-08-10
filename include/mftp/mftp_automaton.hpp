@@ -62,7 +62,6 @@ namespace mftp {
 
     // Periodic acitivities.
     alarm_state_t m_alarm_state; // State of alarm state machine.
-    alarm_state_t m_fragment_alarm_state; // State of fragment alarm state machine.
     ioa::time m_announcement_interval; // Must wait this amount of time after m_fragment_time to send an announcement.
     ioa::time m_match_interval; // Must wait this amount of time after m_match_time to send a match.
 
@@ -87,6 +86,8 @@ namespace mftp {
     // Termination.
     bool m_suicide_flag;  // Self-destruct when job is done.
     bool m_reported; // True when we have reported a complete download.
+
+    uint32_t m_frags_sent;
 
   public:
     // Not matching.
@@ -131,12 +132,9 @@ namespace mftp {
     void alarm_interrupt_effect ();
     UV_UP_INPUT (mftp_automaton, alarm_interrupt);
 
-    bool set_fragment_alarm_precondition () const;
-    ioa::time set_fragment_alarm_effect ();
-    V_UP_OUTPUT (mftp_automaton, set_fragment_alarm, ioa::time);
-
-    void fragment_alarm_interrupt_effect ();
-    UV_UP_INPUT (mftp_automaton, fragment_alarm_interrupt);
+    bool send_fragment_precondition () const;
+    void send_fragment_effect ();
+    UP_INTERNAL (mftp_automaton, send_fragment);
 
     bool suicide_precondition () const;
     void suicide_effect ();
