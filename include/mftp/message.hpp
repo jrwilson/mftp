@@ -9,7 +9,7 @@ namespace mftp {
   const uint32_t REQUEST = 1;
   const uint32_t MATCH = 2;
 
-  const uint32_t SPANS_SIZE = 63;
+  const uint32_t REQUEST_SIZE = 129;
   const uint32_t MATCHES_SIZE = 12;
 
   struct fragment
@@ -32,57 +32,26 @@ namespace mftp {
     }
   };
 
-  struct span_t
-  {
-    uint32_t start;
-    uint32_t stop;
-
-    span_t& operator= (const std::pair<uint32_t, uint32_t>& p) {
-      start = p.first;
-      stop = p.second;
-      return *this;
-    }
-
-    void convert_to_network () {
-      start = htonl (start);
-      stop = htonl (stop);
-    }
-    
-    void convert_to_host () {
-      start = ntohl (start);
-      stop = ntohl (stop);
-    }
-
-  };
-    
   struct request
   {
     fileid fid;
-    uint32_t span_count;
-    span_t spans[SPANS_SIZE];
+    uint32_t fragments[REQUEST_SIZE];
     
     void convert_to_network () {
       fid.convert_to_network ();
-      for (uint32_t i = 0; i < span_count; ++i) {
-	spans[i].convert_to_network ();
+      for (uint32_t i = 0; i < REQUEST_SIZE; ++i) {
+	fragments[i] = htonl (fragments[i]);
       }
-      span_count = htonl (span_count);
     }
     
     bool convert_to_host () {
       fid.convert_to_host ();
-      span_count = ntohl (span_count);
-      
-      if (span_count == 0 || span_count > SPANS_SIZE) {
-	return false;
-      }
       
       mfileid mid (fid);
-      for (uint32_t i = 0; i < span_count; ++i) {
-	spans[i].convert_to_host ();
+      for (uint32_t i = 0; i < REQUEST_SIZE; ++i) {
+	fragments[i] = ntohl (fragments[i]);
 	
-	if (!((spans[i].start < spans[i].stop) &&
-	      (spans[i].stop <= mid.get_fragment_count ()))) {
+	if (fragments[i] >= mid.get_fragment_count ()) {
 	  return false;
 	}
       }
@@ -162,14 +131,12 @@ namespace mftp {
 
     message (request_type /* */,
 	     const fileid& fileid,
-	     uint32_t span_count,
-	     const span_t * spans)
+	     const uint32_t* fragments)
     {
       header.message_type = REQUEST;
       req.fid = fileid;
-      req.span_count = span_count;
-      for (uint32_t i = 0; i<span_count; i++){
-	req.spans[i] = spans[i];
+      for (uint32_t i = 0; i < REQUEST_SIZE; i++){
+	req.fragments[i] = fragments[i];
       }
     }
 
@@ -231,9 +198,8 @@ namespace mftp {
 
     message_buffer (request_type type,
 		    const fileid& fileid,
-		    uint32_t span_count,
-		    const span_t * spans) :
-      msg (type, fileid, span_count, spans)
+		    const uint32_t* fragments) :
+      msg (type, fileid, fragments)
     { }
 
     message_buffer (match_type type,

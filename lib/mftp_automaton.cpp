@@ -4,8 +4,10 @@ namespace mftp {
   const ioa::time mftp_automaton::ALARM_INTERVAL (1, 0); // 1 second
   const ioa::time mftp_automaton::INIT_INTERVAL (1, 0); // 1 second
   const ioa::time mftp_automaton::MAX_INTERVAL (64, 0); // slightly over 1 minute
-  const ioa::time mftp_automaton::REQUEST_INTERVAL (1, 0);
   const uint32_t mftp_automaton::MAX_FRAGMENT_COUNT (1); // Number of fragments allowed in sendq.
+  const uint32_t mftp_automaton::SHUFFLE_LIMIT (REQUEST_SIZE);
+  const uint32_t mftp_automaton::REREQUEST_NUMERATOR (9);
+  const uint32_t mftp_automaton::REREQUEST_DENOMINATOR (10);
 
   // Not matching.
   mftp_automaton::mftp_automaton (const file& file,
@@ -21,20 +23,20 @@ namespace mftp {
     m_num_frag_in_sendq (0),
     m_num_req_in_sendq (0),
     m_num_match_in_sendq (0),
-    m_last_sent_idx (rand () % m_mfileid.get_fragment_count ()),
+    m_inserts_since_shuffle (0),
+    m_request_idx (0),
+    m_last_request_size (0),
+    m_fragments_since_request (0),
     m_alarm_state (SET_READY),
     m_announcement_interval (INIT_INTERVAL),
+    m_request_interval (INIT_INTERVAL),
     m_match_interval (INIT_INTERVAL),
-    m_request_count (1),
-    m_num_frags_in_last_req (0),
-    m_num_new_frags_since_req (0),
     m_fragments_since_report (0),
     m_progress_threshold (progress_threshold),
     m_matching (false),
     m_get_matching_files (false),
     m_suicide_flag (suicide),
-    m_reported (m_file.complete ()),
-    m_frags_sent (0)
+    m_reported (m_file.complete ())
   {
     create_bindings ();
   }
@@ -56,13 +58,14 @@ namespace mftp {
     m_num_frag_in_sendq (0),
     m_num_req_in_sendq (0),
     m_num_match_in_sendq (0),
-    m_last_sent_idx (rand () % m_mfileid.get_fragment_count ()),
+    m_inserts_since_shuffle (0),
+    m_request_idx (0),
+    m_last_request_size (0),
+    m_fragments_since_request (0),
     m_alarm_state (SET_READY),
     m_announcement_interval (INIT_INTERVAL),
+    m_request_interval (INIT_INTERVAL),
     m_match_interval (INIT_INTERVAL),
-    m_request_count (1),
-    m_num_frags_in_last_req (0),
-    m_num_new_frags_since_req (0),
     m_fragments_since_report (0),
     m_progress_threshold (progress_threshold),
     m_matching (true),
@@ -70,8 +73,7 @@ namespace mftp {
     m_match_predicate (match_pred.clone ()),
     m_get_matching_files (get_matching_files),
     m_suicide_flag (suicide),
-    m_reported (m_file.complete ()),
-    m_frags_sent (0)
+    m_reported (m_file.complete ())
   {
     create_bindings ();
   }
@@ -135,7 +137,7 @@ namespace mftp {
     // We need at least one fragment.
     // If there are requests, then fragments are forthcoming so don't do anything.
     // There is room in the sendq for another fragment.
-    if (!m_file.empty () && m_requests.empty () && m_num_frag_in_sendq < MAX_FRAGMENT_COUNT) {
+    if (!m_file.empty () && m_requests_set.empty () && m_num_frag_in_sendq < MAX_FRAGMENT_COUNT) {
       const ioa::time now = ioa::time::now ();
       if (m_frag_recv_time + m_announcement_interval <= now) {
 	// Send a fragment.
@@ -150,7 +152,6 @@ namespace mftp {
   }
   
   void mftp_automaton::send_request () {
-
     // We have requests to send.
     // There are no requests in the sendq.
     // Enough time has elapsed since we sent a request or received a new fragment.
@@ -158,54 +159,52 @@ namespace mftp {
     if (!m_file.complete () &&
 	m_num_req_in_sendq == 0) {
 
-      ioa::time now = ioa::time::now ();
+      const ioa::time now = ioa::time::now ();
+      const bool timeout = m_request_timeout_start + m_request_interval <= now;
+      const bool percent = REREQUEST_DENOMINATOR * m_fragments_since_request >= REREQUEST_NUMERATOR * m_last_request_size;
 
-      const bool frag_flag = 2 * m_num_new_frags_since_req >= 1 * m_num_frags_in_last_req;
-      const bool time_flag = m_request_time + REQUEST_INTERVAL <= now;
+      if (timeout) {
+	// Increase the interval.
+	m_request_interval += m_request_interval;
+	m_request_interval = std::min (m_request_interval, MAX_INTERVAL);
+	std::cout << "Timeout" << std::endl;
+      }
 
-      if (frag_flag || time_flag) {
-
-	if (frag_flag) {
-	  std::cout << "Increase" << std::endl;
-	  ++m_request_count;
+      if (timeout || percent) {
+	interval_set<uint32_t>::const_iterator pos = m_file.m_dont_have.lower_bound (std::make_pair (m_request_idx, m_request_idx + 1));
+	if (pos == m_file.m_dont_have.end ()) {
+	  pos = m_file.m_dont_have.begin ();
 	}
-	else if (time_flag) {
-	  std::cout << "Reduce" << std::endl;
-	  m_request_count /= 2;
-	}
-	
-	m_request_count = std::max (m_request_count, 1u);
-	
-	// Reset.
-	m_num_new_frags_since_req = 0;
-	m_num_frags_in_last_req = 0;
-	m_request_time = now;
-	
-	// Turn the fragments we don't have into requests.
-	interval_set<uint32_t>::const_iterator pos = m_file.m_dont_have.begin ();
-	while (m_num_frags_in_last_req < m_request_count &&
-	       pos != m_file.m_dont_have.end ()) {
-	  span_t spans[SPANS_SIZE];
-	  uint32_t span_count = 0;
-	  
-	  while (m_num_frags_in_last_req < m_request_count &&
-		 pos != m_file.m_dont_have.end () && span_count < SPANS_SIZE) {
-	    spans[span_count] = *pos;
-	    m_num_frags_in_last_req += (pos->second - pos->first);
-	    if (m_num_frags_in_last_req > m_request_count) {
-	      spans[span_count].stop -= (m_num_frags_in_last_req - m_request_count);
-	      m_num_frags_in_last_req = m_request_count;
-	    }
-	    std::cout << "Requesting [" << spans[span_count].start << "," << spans[span_count].stop << ")" << std::endl;
-	    ++span_count;
-	    ++pos;
+
+	std::set<uint32_t> frags;
+	uint32_t fragments[REQUEST_SIZE];
+
+	uint32_t idx = 0;
+	while (idx < REQUEST_SIZE) {
+	  if (interval_set<uint32_t>::intersect (*pos, std::make_pair (m_request_idx, m_request_idx + 1))) {
+	    frags.insert (m_request_idx);
+	    fragments[idx++] = m_request_idx++;
 	  }
-	  
-	  message_buffer* m = new message_buffer (request_type (), m_fileid, span_count, spans);
-	  m->convert_to_network ();
-	  m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
-	  ++m_num_req_in_sendq;
+	  else {
+	    ++pos;
+	    if (pos == m_file.m_dont_have.end ()) {
+	      pos = m_file.m_dont_have.begin ();
+	    }
+	    m_request_idx = pos->first;
+	  }
 	}
+
+	m_last_request_size = frags.size ();
+
+	message_buffer* m = new message_buffer (request_type (), m_fileid, fragments);
+	m->convert_to_network ();
+	m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+	++m_num_req_in_sendq;
+
+	// Reset.
+	m_request_timeout_start = now;
+	m_fragments_since_request = 0;
+	m_last_request_size = 0;
       }
     }
   }
@@ -295,18 +294,20 @@ namespace mftp {
 	    m_frag_recv_time = ioa::time::now ();
 
 	    // Remove fragment from requests.
-	    m_requests.erase (std::make_pair (m->frag.idx, m->frag.idx + 1));
+	    m_requests_set.erase (m->frag.idx);
 
 	    // Save the fragment.
 	    if (!m_file.complete ()) {
 	      if (m_file.write_chunk (m->frag.idx, m->frag.data)) {
-		// Accounting.
-		++m_num_new_frags_since_req;
+		// Just received an new fragment.  Push the time to send a request.
+		m_request_timeout_start = ioa::time::now ();
 		++m_fragments_since_report;
-		// Reset the request interval.
-		send_request ();
 	      }
 	    }
+
+	    // Send a request, possibly.
+	    ++m_fragments_since_request;
+	    send_request ();
 	  }
 
 	  // Otherwise, we could be looking for files that might match our file.
@@ -344,20 +345,26 @@ namespace mftp {
       {
 	// Requests must be for our file.
 	if (m->req.fid == m_fileid) {
+
+	  // TODO:  Do somethign with the rate.
+	  //std::cout << "Rate: " << m->req.fragment_rate << std::endl;
+
 	  // Add the requests to the current set of requests.
-	  for (uint32_t sp = 0; sp < m->req.span_count; ++sp){
-	    // Request must be in range.
-	    if (m->req.spans[sp].start < m->req.spans[sp].stop &&
-		m->req.spans[sp].stop <= m_mfileid.get_fragment_count ()) {
-	      std::cout << "Received [" << m->req.spans[sp].start << "," << m->req.spans[sp].stop << ")" << std::endl;
-	      m_requests.insert (std::make_pair (m->req.spans[sp].start, m->req.spans[sp].stop));
+	  for (uint32_t idx = 0; idx < REQUEST_SIZE; ++idx) {
+	    // If we have the fragment.
+	    if (m_file.m_dont_have.find_first_intersect (std::make_pair (m->req.fragments[idx], m->req.fragments[idx] + 1)) == m_file.m_dont_have.end ()) {
+	      std::pair<std::set<uint32_t>::iterator, bool> p = m_requests_set.insert (m->req.fragments[idx]);
+	    // If the fragment was not already requested.
+	    if (p.second) {
+	      // Add to the set of requested fragments.
+	      m_requests_deque.push_back (m->req.fragments[idx]);
+	      ++m_inserts_since_shuffle;
+	      if (m_inserts_since_shuffle >= SHUFFLE_LIMIT) {
+		std::random_shuffle (m_requests_deque.begin (), m_requests_deque.end ());
+		m_inserts_since_shuffle = 0;
+	      }
 	    }
 	  }
-	  // Remove fragments we don't have from the set of requests.
-	  for (interval_set<uint32_t>::const_iterator pos = m_file.m_dont_have.begin ();
-	       pos != m_file.m_dont_have.end ();
-	       ++pos) {
-	    m_requests.erase (*pos);
 	  }
 	}
       }
@@ -456,38 +463,25 @@ namespace mftp {
   }
 
   bool mftp_automaton::send_fragment_precondition () const {
-    return !m_requests.empty () && m_num_frag_in_sendq < MAX_FRAGMENT_COUNT;
+    return !m_requests_deque.empty () && m_num_frag_in_sendq < MAX_FRAGMENT_COUNT;
   }
-  
-  void mftp_automaton::send_fragment_effect () {
-    // Move the index.
-    m_last_sent_idx = (m_last_sent_idx + 1) % m_mfileid.get_fragment_count ();
-    
-    // If it is not requested, move to next region.
-    if (m_requests.find_first_intersect (std::make_pair (m_last_sent_idx, m_last_sent_idx + 1)) == m_requests.end ()) {
-      interval_set<uint32_t>::const_iterator pos = m_requests.lower_bound (std::make_pair (m_last_sent_idx, m_last_sent_idx + 1));
-      if (pos == m_requests.end ()) {
-	// Start over.
-	pos = m_requests.begin ();
-      }
-      m_last_sent_idx = pos->first;      
-    }
-    
-    // Remove it from the requests.
-    m_requests.erase (std::make_pair (m_last_sent_idx, m_last_sent_idx + 1));
-    
-    // Get the fragment for that index.
-    message_buffer* m = get_fragment (m_last_sent_idx);
-    m->convert_to_network ();
-    m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
-    ++m_num_frag_in_sendq;
-    ++m_frags_sent;
 
-    if (m_requests.empty ()) {
-      std::cout << "Done " << m_frags_sent << std::endl;
-      m_frags_sent = 0;
+  void mftp_automaton::send_fragment_effect () {
+    uint32_t idx = m_requests_deque.front ();
+    m_requests_deque.pop_front ();
+    
+    std::set<uint32_t>::const_iterator pos = m_requests_set.find (idx);
+    if (pos != m_requests_set.end ()) {
+      // Remove it from the requests.
+      m_requests_set.erase (pos);
+      
+      // Get the fragment for that index.
+      message_buffer* m = get_fragment (idx);
+      m->convert_to_network ();
+      m_sendq.push (ioa::const_shared_ptr<message_buffer> (m));
+      ++m_num_frag_in_sendq;
     }
-  }  
+  }
 
   bool mftp_automaton::download_complete_precondition () const {
     return m_file.complete () && !m_reported && ioa::binding_count (&mftp_automaton::download_complete) != 0;

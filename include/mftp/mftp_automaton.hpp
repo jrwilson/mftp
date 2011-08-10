@@ -4,7 +4,6 @@
 #include <mftp/match.hpp>
 #include <mftp/mftp_channel_automaton.hpp>
 #include <ioa/alarm_automaton.hpp>
-#include <mftp/interval_set.hpp>
 
 #include <queue>
 #include <set>
@@ -28,8 +27,10 @@ namespace mftp {
     static const ioa::time ALARM_INTERVAL;
     static const ioa::time INIT_INTERVAL;
     static const ioa::time MAX_INTERVAL;
-    static const ioa::time REQUEST_INTERVAL;
     static const uint32_t MAX_FRAGMENT_COUNT;
+    static const uint32_t SHUFFLE_LIMIT;
+    static const uint32_t REREQUEST_NUMERATOR;
+    static const uint32_t REREQUEST_DENOMINATOR;
 
     ioa::handle_manager<mftp_automaton> m_self;
     file m_file;
@@ -46,23 +47,25 @@ namespace mftp {
     uint32_t m_num_match_in_sendq; // Number of matches in the send queue.
 
     // Answering requests.
-    interval_set<uint32_t> m_requests; // Set of intervals indicating fragments that have been requested.
-    uint32_t m_last_sent_idx; // Index of last fragment sent.
+    std::set<uint32_t> m_requests_set; // Set of fragments that have been requested.
+    std::deque<uint32_t> m_requests_deque; // Superset of set organized as deque.
+    uint32_t m_inserts_since_shuffle; // Number of inserts since shuffle.
+
+    // Making requests.
+    uint32_t m_request_idx; // Index for requests.
+    uint32_t m_last_request_size; // Number of fragments in last request (<= REQUEST_SIZE).
+    uint32_t m_fragments_since_request; // Number of fragments received since request.
 
     // Timestamps for certain events.
     ioa::time m_frag_recv_time; // Time when this automaton last received a fragment (of this file).
-    ioa::time m_request_time; // Time when this automaton last sent a request.
+    ioa::time m_request_timeout_start; // Time when this automaton last sent a request or received a fragment (of this file).
     ioa::time m_match_time; // Time when this automaton last received a match (of this file).
 
     // Periodic acitivities.
     alarm_state_t m_alarm_state; // State of alarm state machine.
     ioa::time m_announcement_interval; // Must wait this amount of time after m_fragment_time to send an announcement.
+    ioa::time m_request_interval; // Must wait this amount of time after m_request_time to send a request for timeout.
     ioa::time m_match_interval; // Must wait this amount of time after m_match_time to send a match.
-
-    // Sending requests.
-    uint32_t m_request_count; // Number of fragments to request.
-    uint32_t m_num_frags_in_last_req; // Number of fragments in most recent request.
-    uint32_t m_num_new_frags_since_req; // New fragments received since most recent request.
 
     // Reporting progress.
     uint32_t m_fragments_since_report; // Number of fragments received since last progress report.
@@ -81,8 +84,6 @@ namespace mftp {
     // Termination.
     bool m_suicide_flag;  // Self-destruct when job is done.
     bool m_reported; // True when we have reported a complete download.
-
-    uint32_t m_frags_sent;
 
   public:
     // Not matching.
