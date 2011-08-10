@@ -4,7 +4,7 @@ namespace mftp {
   const ioa::time mftp_automaton::ALARM_INTERVAL (1, 0); // 1 second
   const ioa::time mftp_automaton::INIT_INTERVAL (1, 0); // 1 second
   const ioa::time mftp_automaton::MAX_INTERVAL (64, 0); // slightly over 1 minute
-  const ioa::time mftp_automaton::REQUEST_INTERVAL (INIT_INTERVAL);
+  const ioa::time mftp_automaton::REQUEST_INTERVAL (1, 0);
   const uint32_t mftp_automaton::MAX_FRAGMENT_COUNT (1); // Number of fragments allowed in sendq.
 
   // Not matching.
@@ -163,18 +163,19 @@ namespace mftp {
       const bool frag_flag = 2 * m_num_new_frags_since_req >= 1 * m_num_frags_in_last_req;
       const bool time_flag = m_request_time + REQUEST_INTERVAL <= now;
 
-      if (frag_flag) {
-	std::cout << "Increase" << std::endl;
-	++m_request_count;
-      }
-      else if (time_flag) {
-	std::cout << "Reduce" << std::endl;
-	m_request_count /= 2;
-      }
-
-      m_request_count = std::max (m_request_count, 1u);
-
       if (frag_flag || time_flag) {
+
+	if (frag_flag) {
+	  std::cout << "Increase" << std::endl;
+	  ++m_request_count;
+	}
+	else if (time_flag) {
+	  std::cout << "Reduce" << std::endl;
+	  m_request_count /= 2;
+	}
+	
+	m_request_count = std::max (m_request_count, 1u);
+	
 	// Reset.
 	m_num_new_frags_since_req = 0;
 	m_num_frags_in_last_req = 0;
