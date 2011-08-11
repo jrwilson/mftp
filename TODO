@@ -3,6 +3,3 @@ Work with pointers to files eliminate copying files.
 
 * Matches
 We accumulate matches without ever forgetting them.  We should purge matches that we haven't seen in a while.
-
-* Change file interface to use fragment indices.
-* Change requests to use fragment indices as well.
