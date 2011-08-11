@@ -40,7 +40,7 @@ namespace mftp {
       calculate_lengths ();
     }
 
-    void set_hash (const uint8_t* hash) {
+    void set_hash (const char* hash) {
       memcpy (m_fileid.hash, hash, HASH_SIZE);
     }
 

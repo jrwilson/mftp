@@ -15,7 +15,7 @@ namespace mftp {
   {
     fileid fid;
     uint32_t idx;
-    uint8_t data[FRAGMENT_SIZE];
+    char data[FRAGMENT_SIZE];
 
     void convert_to_network () {
       fid.convert_to_network ();

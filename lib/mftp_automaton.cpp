@@ -526,7 +526,7 @@ namespace mftp {
   }
 
   std::string* mftp_automaton::get_fragment (uint32_t idx) {
-    message m (fragment_type (), m_fileid, idx, static_cast<const char*> (m_file.get_data_ptr ()) + idx * FRAGMENT_SIZE);
+    message m (fragment_type (), m_fileid, idx, m_file.get_data ().data () + idx * FRAGMENT_SIZE);
     m.convert_to_network ();
     return new std::string (reinterpret_cast<char*> (&m), sizeof (m));
   }

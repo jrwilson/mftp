@@ -5,6 +5,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <string>
+#include <sys/stat.h>
 
 namespace jam {
   
@@ -24,10 +25,6 @@ namespace jam {
       m_filename (fname),
       m_sharename (sname)
     {
-      mftp::file file (m_filename, FILE_TYPE);
-      mftp::fileid copy = file.get_mfileid ().get_fileid ();
-      std::cout << "Sharing " << m_filename << " as " << (m_sharename + "-" + copy.to_string ()) << std::endl;
-
       channel = new ioa::automaton_manager<mftp::mftp_channel_automaton> (this, ioa::make_generator<mftp::mftp_channel_automaton> (jam::SEND_ADDR, jam::LOCAL_ADDR, true));
       
       add_observable (channel);
@@ -42,8 +39,32 @@ namespace jam {
 
       if (channel != 0) {
 	if (channel->get_handle () != -1) {
-	  mftp::file file (m_filename, FILE_TYPE);
+	  int fd = open (m_filename.c_str (), O_RDONLY);
+	  if (fd == -1) {
+	    perror ("open");
+	    exit (EXIT_FAILURE);
+	  }
+
+	  struct stat stats;
+	  if (fstat (fd, &stats) == -1) {
+	    perror ("fstat");
+	    exit (EXIT_FAILURE);
+	  }
+
+	  // TODO:  Use streams.
+	  char* buf = new char[stats.st_size];
+	  if (read (fd, buf, stats.st_size) != stats.st_size) {
+	    perror ("read");
+	    exit (EXIT_FAILURE);
+	  }
+
+	  close (fd);
+
+	  mftp::file file (buf, stats.st_size, FILE_TYPE);
+	  delete[] buf;
+
 	  mftp::fileid copy = file.get_mfileid ().get_fileid ();
+	  std::cout << "Sharing " << m_filename << " as " << (m_sharename + "-" + copy.to_string ()) << std::endl;
 	  copy.convert_to_network ();
 
 	  std::string buff;

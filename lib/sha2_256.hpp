@@ -18,7 +18,7 @@ private:
   unsigned int h[8];
   unsigned int total_length;
   unsigned int buf_length;
-  unsigned char buf[64];
+  char buf[64];
 
   static unsigned int right_rotate (unsigned int x,
 				    unsigned int s);
@@ -27,10 +27,10 @@ private:
 public:
   sha2_256 ();
   sha2_256 (const unsigned int length,
-	    const unsigned char* hash);
+	    const char* hash);
   void finalize ();
-  void get (unsigned char* hash) const;
-  void update (const unsigned char* data,
+  void get (char* hash) const;
+  void update (const char* data,
 	       size_t length);
 };
 

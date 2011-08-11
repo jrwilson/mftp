@@ -69,7 +69,7 @@ namespace jam {
       new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (*meta_file, channel->get_handle (), query_predicate (m_filename), query_filename_predicate (m_filename), false, false, 0));
       
       mftp::fileid fid;
-      memcpy (&fid, meta_file->get_data_ptr (), sizeof (mftp::fileid));
+      meta_file->get_data ().copy (reinterpret_cast<char *> (&fid), sizeof (mftp::fileid));
       fid.convert_to_host();
       
       ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), channel->get_handle(), false, FRAG_COUNT));
@@ -100,7 +100,8 @@ namespace jam {
 	exit (EXIT_FAILURE);
       }
 
-      size_t er = fwrite (f.get_data_ptr (), 1, f.get_mfileid ().get_original_length (), fp);
+      // TODO:  Use streams.
+      size_t er = fwrite (f.get_data ().data (), 1, f.get_mfileid ().get_original_length (), fp);
       if (er < f.get_mfileid ().get_original_length ()) {
 	std::cerr << "fwrite: couldn't write to " << m_filename << std::endl;
 	exit (EXIT_FAILURE);

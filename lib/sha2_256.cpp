@@ -89,7 +89,7 @@ sha2_256::sha2_256 () :
 }
 
 sha2_256::sha2_256 (const unsigned int length,
-		    const unsigned char* hash) :
+		    const char* hash) :
   total_length (length),
   buf_length (0)
 {
@@ -146,7 +146,7 @@ void sha2_256::finalize () {
   process ();
 }
 
-void sha2_256::get (unsigned char* hash) const {
+void sha2_256::get (char* hash) const {
   assert (buf_length == 0);
   for (unsigned int idx = 0; idx < 8; ++idx) {
     unsigned int x = htonl (h[idx]);
@@ -154,7 +154,7 @@ void sha2_256::get (unsigned char* hash) const {
   }
 }
 
-void sha2_256::update (const unsigned char* data,
+void sha2_256::update (const char* data,
 		       size_t length) {
   size_t read_idx = 0;
   while (read_idx < length) {

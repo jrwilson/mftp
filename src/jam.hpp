@@ -41,7 +41,7 @@ namespace jam {
     { }
 
     bool operator() (const mftp::file& f) const {
-      return filename == std::string (static_cast<const char*> (f.get_data_ptr ()) + sizeof (mftp::fileid), filename.size ());
+      return filename == f.get_data ().substr (sizeof (mftp::fileid), filename.size ());
     }
 
     meta_filename_predicate* clone () const {
@@ -78,7 +78,7 @@ namespace jam {
     { }
 
     bool operator() (const mftp::file& f) const {
-      return filename == std::string (static_cast<const char*> (f.get_data_ptr ()) + sizeof (uuid_t), filename.size ());
+      return filename == f.get_data ().substr (sizeof (uuid_t), filename.size ());
     }
 
     query_filename_predicate* clone () const {
