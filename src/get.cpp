@@ -46,13 +46,14 @@ namespace jam {
 	if (channel->get_handle () != -1) {
 
 	  //Create the instance server.
+	  std::auto_ptr<mftp::file> f (new mftp::file ());
+	  
 	  uuid_t id;
 	  uuid_generate (id);
-	  std::string buff;
-	  buff.append (reinterpret_cast<char*> (id), sizeof (uuid_t));
-	  buff.append (m_filename.c_str (), m_filename.size ());
+	  f->get_data ().append (reinterpret_cast<char*> (id), sizeof (uuid_t));
+	  f->get_data ().append (m_filename);
 
-	  mftp::file f (buff.data (), buff.size (), QUERY_TYPE);
+	  f->finalize (QUERY_TYPE);
 
 	  // Create the query server.
 	  ioa::automaton_manager<mftp::mftp_automaton>* query = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, channel->get_handle (), meta_predicate (m_filename), meta_filename_predicate (m_filename), true, false, 0));
@@ -66,13 +67,14 @@ namespace jam {
   
     void match_complete_effect (const ioa::const_shared_ptr<mftp::file>& meta_file) {
       // Create the meta server.
-      new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (*meta_file, channel->get_handle (), query_predicate (m_filename), query_filename_predicate (m_filename), false, false, 0));
-      
+      new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (meta_file, channel->get_handle (), query_predicate (m_filename), query_filename_predicate (m_filename), false, false, 0));
+
       mftp::fileid fid;
       meta_file->get_data ().copy (reinterpret_cast<char *> (&fid), sizeof (mftp::fileid));
       fid.convert_to_host();
-      
-      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (mftp::file (fid), channel->get_handle(), false, FRAG_COUNT));
+      std::auto_ptr<mftp::file> f (new mftp::file (fid));
+
+      ioa::automaton_manager<mftp::mftp_automaton>* file_home = new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (f, channel->get_handle(), false, FRAG_COUNT));
       
       data_files.insert(std::make_pair(fid, file_home));
       
@@ -91,8 +93,8 @@ namespace jam {
     V_UP_INPUT (mftp_client_automaton, match_complete, ioa::const_shared_ptr<mftp::file>);
   
   private:
-    void file_complete_effect (const mftp::file& f, ioa::aid_t){
-      std::string path (m_filename + "-" + f.get_mfileid ().get_fileid ().to_string ());
+    void file_complete_effect (const ioa::const_shared_ptr<mftp::file>& f, ioa::aid_t) {
+      std::string path (m_filename + "-" + f->get_mfileid ().get_fileid ().to_string ());
       // TODO:  Add error checking.
       FILE* fp = fopen (path.c_str (), "w");
       if (fp == NULL) {
@@ -101,8 +103,8 @@ namespace jam {
       }
 
       // TODO:  Use streams.
-      size_t er = fwrite (f.get_data ().data (), 1, f.get_mfileid ().get_original_length (), fp);
-      if (er < f.get_mfileid ().get_original_length ()) {
+      size_t er = fwrite (f->get_data ().data (), 1, f->get_mfileid ().get_original_length (), fp);
+      if (er < f->get_mfileid ().get_original_length ()) {
 	std::cerr << "fwrite: couldn't write to " << m_filename << std::endl;
 	exit (EXIT_FAILURE);
       }
@@ -114,7 +116,7 @@ namespace jam {
       }
       
       ioa::time t = ioa::time::now () - m_transfer;
-      double num_bytes = double (f.get_mfileid ().get_original_length ());
+      double num_bytes = double (f->get_mfileid ().get_original_length ());
       double time = double (t.sec ()) + double(t.usec ())/1000000.0;
       double rate = num_bytes / time;
       if(num_bytes > 1024) {
@@ -137,7 +139,7 @@ namespace jam {
     }
   
   public:
-    V_AP_INPUT (mftp_client_automaton, file_complete, mftp::file);
+    V_AP_INPUT (mftp_client_automaton, file_complete, ioa::const_shared_ptr<mftp::file>);
 
   private:
     void update_progress_effect (const uint32_t& have, ioa::aid_t id) {

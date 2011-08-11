@@ -33,7 +33,8 @@ namespace mftp {
     static const uint32_t REREQUEST_DENOMINATOR;
 
     ioa::handle_manager<mftp_automaton> m_self;
-    file m_file;
+    ioa::const_shared_ptr<file> m_file;
+    file* m_file_ptr;
     const mfileid& m_mfileid;
     const fileid& m_fileid;
 
@@ -87,13 +88,26 @@ namespace mftp {
 
   public:
     // Not matching.
-    mftp_automaton (const file& file,
+    mftp_automaton (std::auto_ptr<file> file,
+		    const ioa::automaton_handle<mftp_channel_automaton>& channel,
+		    const bool suicide,
+		    const uint32_t progress_threshold);
+
+    mftp_automaton (const ioa::const_shared_ptr<file>& file,
 		    const ioa::automaton_handle<mftp_channel_automaton>& channel,
 		    const bool suicide,
 		    const uint32_t progress_threshold);
 
     // Matching.
-    mftp_automaton (const file& file,
+    mftp_automaton (std::auto_ptr<file> file,
+		    const ioa::automaton_handle<mftp_channel_automaton>& channel,
+		    const match_candidate_predicate& match_candidate_pred,
+		    const match_predicate& match_pred,
+		    const bool get_matching_files,
+		    const bool suicide,
+		    const uint32_t progress_threshold);
+
+    mftp_automaton (const ioa::const_shared_ptr<file>& file,
 		    const ioa::automaton_handle<mftp_channel_automaton>& channel,
 		    const match_candidate_predicate& match_candidate_pred,
 		    const match_predicate& match_pred,
@@ -104,7 +118,7 @@ namespace mftp {
   private:
     void create_bindings ();
     void schedule () const;
-    void process_match_candidate (const file& f);
+    void process_match_candidate (const ioa::const_shared_ptr<file>& f);
     std::string* get_fragment (uint32_t idx);
     void send_announcement ();
     void send_request ();
@@ -136,9 +150,9 @@ namespace mftp {
     void suicide_effect ();
     UP_INTERNAL (mftp_automaton, suicide);
 
-    void match_download_complete_effect (const file& f,
+    void match_download_complete_effect (const ioa::const_shared_ptr<file>& f,
 					 ioa::aid_t aid);
-    V_AP_INPUT (mftp_automaton, match_download_complete, file);
+    V_AP_INPUT (mftp_automaton, match_download_complete, ioa::const_shared_ptr<file>);
 
   private:
     bool fragment_count_precondition () const;
@@ -148,9 +162,9 @@ namespace mftp {
 
   private:
     bool download_complete_precondition () const;
-    file download_complete_effect ();
+    ioa::const_shared_ptr<file> download_complete_effect ();
   public:
-    V_UP_OUTPUT (mftp_automaton, download_complete, file);
+    V_UP_OUTPUT (mftp_automaton, download_complete, ioa::const_shared_ptr<file>);
 
   private: 
     bool match_complete_precondition () const;

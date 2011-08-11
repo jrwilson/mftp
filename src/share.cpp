@@ -60,24 +60,19 @@ namespace jam {
 
 	  close (fd);
 
-	  mftp::file file (buf, stats.st_size, FILE_TYPE);
+	  std::auto_ptr<mftp::file> file (new mftp::file (buf, stats.st_size, FILE_TYPE));
 	  delete[] buf;
 
-	  mftp::fileid copy = file.get_mfileid ().get_fileid ();
+	  mftp::fileid copy = file->get_mfileid ().get_fileid ();
 	  std::cout << "Sharing " << m_filename << " as " << (m_sharename + "-" + copy.to_string ()) << std::endl;
 	  copy.convert_to_network ();
 
-	  std::string buff;
-	  buff.append (reinterpret_cast<char *> (&copy), sizeof (mftp::fileid));
-	  buff.append (m_sharename.c_str (), m_sharename.size ());
+	  std::auto_ptr<mftp::file> meta (new mftp::file ());
 
-	  mftp::file meta (buff.data (), buff.size (), META_TYPE);
+	  meta->get_data ().append (reinterpret_cast<char *> (&copy), sizeof (mftp::fileid));
+	  meta->get_data ().append (m_sharename);
+	  meta->finalize (META_TYPE);
 
-	  std::string buff2;
-	  buff2.append (m_sharename);
-
-	  mftp::file query (buff.data (), buff.size (), QUERY_TYPE);
-	
 	  // Create the file server.
 	  new ioa::automaton_manager<mftp::mftp_automaton> (this, ioa::make_generator<mftp::mftp_automaton> (file, channel->get_handle(), false, 0));
 	

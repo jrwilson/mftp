@@ -2,6 +2,14 @@
 #include "sha2_256.hpp"
 
 namespace mftp {
+  file::file () { }
+
+  file::file (const char* ptr,
+	      uint32_t size,
+	      uint32_t type) :
+    m_data (ptr, size) {
+    finalize (type);
+  }
 
   file::file (const fileid& f) :
     m_mfileid (f),
@@ -18,33 +26,15 @@ namespace mftp {
     m_have_count (other.m_have_count)
   { }
 
-  file::file (const char* ptr, uint32_t size, uint32_t type)
-  {
-    m_mfileid.set_length (size);
-    m_mfileid.set_type (type);
-    m_have_count = m_mfileid.get_fragment_count ();
-
-    m_data.append (ptr, size);
-    m_data.resize (m_mfileid.get_final_length ());
-  
-    // Clear the padding.
-    for (uint32_t idx = m_mfileid.get_original_length (); idx < m_mfileid.get_padded_length (); ++idx) {
-      m_data[idx] = 0;
-    }
-
-    sha2_256 digester;
-    digester.update (m_data.data (), m_mfileid.get_final_length ());
-    digester.finalize ();
-    char samp[HASH_SIZE];
-    digester.get (samp);
-    m_mfileid.set_hash (samp);
-  }
-
   const mfileid& file::get_mfileid () const {
     return m_mfileid;
   }
   
   const std::string& file::get_data () const {
+    return m_data;
+  }
+
+  std::string& file::get_data () {
     return m_data;
   }
 
@@ -93,5 +83,26 @@ namespace mftp {
       return pos->second;
     }
   }
+  
+  void file::finalize (uint32_t type) {
+    m_mfileid.set_length (m_data.size ());
+    m_mfileid.set_type (type);
+    m_have_count = m_mfileid.get_fragment_count ();
+
+    m_data.resize (m_mfileid.get_final_length ());
+  
+    // Clear the padding.
+    for (uint32_t idx = m_mfileid.get_original_length (); idx < m_mfileid.get_padded_length (); ++idx) {
+      m_data[idx] = 0;
+    }
+
+    sha2_256 digester;
+    digester.update (m_data.data (), m_mfileid.get_final_length ());
+    digester.finalize ();
+    char samp[HASH_SIZE];
+    digester.get (samp);
+    m_mfileid.set_hash (samp);
+  }
+
 
 }

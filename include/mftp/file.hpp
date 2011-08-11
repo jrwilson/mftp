@@ -15,21 +15,24 @@ namespace mftp {
     std::string m_data;
     uint32_t m_have_count;
 
-  public:
-    file (const fileid& f);
+    // Can't copy.
     file (const file& other);
-    file (const char* ptr,
-	  uint32_t size,
-	  uint32_t type);
+
+  public:
+    file ();
+    file (const char* ptr, uint32_t size, uint32_t type);
+    file (const fileid& f);
     
     const mfileid& get_mfileid () const;
     const std::string& get_data () const;
+    std::string& get_data ();
     uint32_t have_count () const;
     bool complete () const;
     bool empty () const;
     bool write_chunk (const uint32_t idx,
 		      const char* data);
     uint32_t get_first_fragment_index () const;
+    void finalize (uint32_t type);
   };
 }
 
