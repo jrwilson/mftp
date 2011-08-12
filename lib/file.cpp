@@ -11,6 +11,12 @@ namespace mftp {
     finalize (type);
   }
 
+  file::file (const std::string& s,
+	      uint32_t type) :
+    m_data (s) {
+    finalize (type);
+  }
+
   file::file (const fileid& f) :
     m_mfileid (f),
     m_have_count (0)

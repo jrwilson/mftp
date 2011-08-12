@@ -20,6 +20,7 @@ namespace mftp {
 
   public:
     file ();
+    file (const std::string&, uint32_t type);
     file (const char* ptr, uint32_t size, uint32_t type);
     file (const fileid& f);
     
