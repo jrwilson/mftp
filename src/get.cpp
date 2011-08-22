@@ -89,6 +89,10 @@ namespace jam {
       m_transfer = ioa::time::now ();
     }
   
+    void match_complete_schedule () const {
+      schedule ();
+    }
+
   public:
     V_UP_INPUT (mftp_client_automaton, match_complete, ioa::const_shared_ptr<mftp::file>);
   
@@ -138,6 +142,10 @@ namespace jam {
       std::cout << "Created " << path << std::endl;
     }
   
+    void file_complete_schedule (ioa::aid_t aid) const {
+      schedule ();
+    }
+
   public:
     V_AP_INPUT (mftp_client_automaton, file_complete, ioa::const_shared_ptr<mftp::file>);
 
@@ -159,6 +167,10 @@ namespace jam {
       }
     }
     
+    void update_progress_schedule (ioa::aid_t) const {
+      schedule ();
+    }
+
   public:
     V_AP_INPUT (mftp_client_automaton, update_progress, uint32_t);
 

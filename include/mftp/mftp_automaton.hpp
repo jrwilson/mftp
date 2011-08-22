@@ -127,48 +127,59 @@ namespace mftp {
 
     bool send_precondition () const;
     ioa::const_shared_ptr<std::string> send_effect ();
+    void send_schedule () const { schedule (); }
     V_UP_OUTPUT (mftp_automaton, send, ioa::const_shared_ptr<std::string>);
 
     void send_complete_effect ();
+    void send_complete_schedule () const { schedule (); }
     UV_UP_INPUT (mftp_automaton, send_complete);
 
     void receive_effect (const ioa::const_shared_ptr<message>& m);
+    void receive_schedule () const { schedule (); }
     V_UP_INPUT (mftp_automaton, receive, ioa::const_shared_ptr<message>);
 
     bool set_alarm_precondition () const;
     ioa::time set_alarm_effect ();
+    void set_alarm_schedule () const { schedule (); }
     V_UP_OUTPUT (mftp_automaton, set_alarm, ioa::time);
 
     void alarm_interrupt_effect ();
+    void alarm_interrupt_schedule () const { schedule (); }
     UV_UP_INPUT (mftp_automaton, alarm_interrupt);
 
     bool send_fragment_precondition () const;
     void send_fragment_effect ();
+    void send_fragment_schedule () const { schedule (); }
     UP_INTERNAL (mftp_automaton, send_fragment);
 
     bool suicide_precondition () const;
     void suicide_effect ();
+    void suicide_schedule () const { schedule (); }
     UP_INTERNAL (mftp_automaton, suicide);
 
     void match_download_complete_effect (const ioa::const_shared_ptr<file>& f,
 					 ioa::aid_t aid);
+    void match_download_complete_schedule (ioa::aid_t) const { schedule (); }
     V_AP_INPUT (mftp_automaton, match_download_complete, ioa::const_shared_ptr<file>);
 
   private:
     bool fragment_count_precondition () const;
     uint32_t fragment_count_effect ();
+    void fragment_count_schedule () const { schedule (); }
   public:
     V_UP_OUTPUT (mftp_automaton, fragment_count, uint32_t);
 
   private:
     bool download_complete_precondition () const;
     ioa::const_shared_ptr<file> download_complete_effect ();
+    void download_complete_schedule () const { schedule (); }
   public:
     V_UP_OUTPUT (mftp_automaton, download_complete, ioa::const_shared_ptr<file>);
 
   private: 
     bool match_complete_precondition () const;
     ioa::const_shared_ptr<file> match_complete_effect ();
+    void match_complete_schedule () const { schedule (); }
   public:
     V_UP_OUTPUT (mftp_automaton, match_complete, ioa::const_shared_ptr<file>);
   };

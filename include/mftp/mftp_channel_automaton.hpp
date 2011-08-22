@@ -46,29 +46,35 @@ namespace mftp {
 
     void send_effect (const ioa::const_shared_ptr<std::string>& message,
 		      ioa::aid_t aid);
+    void send_schedule (ioa::aid_t) const { schedule (); }
   public:
     V_AP_INPUT (mftp_channel_automaton, send, ioa::const_shared_ptr<std::string>);
 
   private:
     bool send_out_precondition () const;
     ioa::udp_sender_automaton::send_arg send_out_effect ();
+    void send_out_schedule () const { schedule (); }
     V_UP_OUTPUT (mftp_channel_automaton, send_out, ioa::udp_sender_automaton::send_arg);
 
     void send_in_complete_effect (const int& result);
+    void send_in_complete_schedule () const { schedule (); }
     V_UP_INPUT (mftp_channel_automaton, send_in_complete, int);
 
   private:
     bool send_complete_precondition (ioa::aid_t aid) const;
     void send_complete_effect (ioa::aid_t aid);
+    void send_complete_schedule (ioa::aid_t) const { schedule (); }
   public:
     UV_AP_OUTPUT (mftp_channel_automaton, send_complete);
 
   private:
     void receive_in_effect (const ioa::udp_receiver_automaton::receive_val& rv);
+    void receive_in_schedule () const { schedule (); }
     V_UP_INPUT (mftp_channel_automaton, receive_in, ioa::udp_receiver_automaton::receive_val);
 
     bool receive_precondition () const;
     ioa::const_shared_ptr<mftp::message> receive_effect ();
+    void receive_schedule () const { schedule (); }
   public:
     V_UP_OUTPUT (mftp_channel_automaton, receive, ioa::const_shared_ptr<mftp::message>);
   };
